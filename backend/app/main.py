@@ -1,4 +1,6 @@
 import os
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -9,11 +11,26 @@ from app.presentation.api.v1.stocks_router import router as stocks_router
 from app.presentation.api.v1.relations_router import router as relations_router
 from app.presentation.api.v1.weights_router import router as weights_router
 from app.presentation.api.v1.network_router import router as network_router
+from app.services.nightly_batch_scheduler import start_apscheduler
+
+logger = logging.getLogger("KinStock.Main")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start APScheduler for Nightly Batch (22:00 ~ 07:00)
+    scheduler = start_apscheduler()
+    logger.info("🚀 KinStock Server & Nightly Scheduler Started.")
+    yield
+    # Shutdown
+    if scheduler:
+        scheduler.shutdown()
+        logger.info("🛑 KinStock Nightly Scheduler Shutdown.")
 
 app = FastAPI(
     title="KinStock Clean Architecture API",
     description="Clean Architecture & DART Verified Open-Source Stock-Figure Network Intelligence Engine",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -23,6 +40,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Health Check Endpoints
+@app.get("/api/health", tags=["System"])
+@app.get("/health", tags=["System"])
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "KinStock Backend Engine",
+        "version": "2.0.0",
+        "environment": "Oracle Cloud ARM64",
+        "scheduler": "APScheduler 3-Phase Nightly Active (22:00~07:00 KST)"
+    }
 
 # 1. Register Clean Architecture API Routers
 app.include_router(search_router, prefix="/api/v1", tags=["Universal Search"])
