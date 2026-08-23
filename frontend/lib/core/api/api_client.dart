@@ -11,6 +11,7 @@ import '../../features/network_stock/data/models/deep_dive_model.dart';
 import '../../features/network_stock/data/models/weight_settings_model.dart';
 import '../../features/network_stock/data/models/stock_related_figures_model.dart';
 import '../../features/network_stock/data/models/search_model.dart';
+import '../../features/network_stock/data/models/synapse_network_model.dart';
 
 class FigureStocksCombinedResult {
   final PersonModel figure;
@@ -258,6 +259,55 @@ class ApiClient {
       debugPrint('ApiClient.getDeepDivePath error: $e, using mock fallback');
       return _getMockDeepDive(personId, companyId);
     }
+  }
+
+  // 6. Synapse Network Graph APIs
+  Future<SynapseSubgraphModel> getPersonNetwork(String personId) async {
+    final uri = Uri.parse('$baseUrl/network/person/$personId');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return SynapseSubgraphModel.fromJson(map);
+      }
+      throw Exception('Failed to load person network: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getPersonNetwork error: $e, using mock fallback');
+      return _getMockSynapseSubgraph(personId, 'PERSON');
+    }
+  }
+
+  Future<SynapseSubgraphModel> getCompanyNetwork(String corpCode) async {
+    final uri = Uri.parse('$baseUrl/network/company/$corpCode');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return SynapseSubgraphModel.fromJson(map);
+      }
+      throw Exception('Failed to load company network: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getCompanyNetwork error: $e, using mock fallback');
+      return _getMockSynapseSubgraph(corpCode, 'COMPANY');
+    }
+  }
+
+  SynapseSubgraphModel _getMockSynapseSubgraph(String focusId, String type) {
+    return SynapseSubgraphModel(
+      focusId: focusId,
+      focusType: type,
+      totalNodes: 3,
+      totalEdges: 2,
+      nodes: [
+        SynapseNodeModel(id: 'P_LEE_JM', label: '이재명', type: 'PERSON', roleOrIndustry: '국회의원 / 당대표', badgeColor: '#30D158'),
+        SynapseNodeModel(id: 'C_045660', label: '에이텍', type: 'COMPANY', roleOrIndustry: '디스플레이/스마트PC', priceChangeRate: 8.63, badgeColor: '#0A84FF'),
+        SynapseNodeModel(id: 'C_025950', label: '동신건설', type: 'COMPANY', roleOrIndustry: '토목건축/SOC', priceChangeRate: 14.13, badgeColor: '#0A84FF'),
+      ],
+      edges: [
+        SynapseEdgeModel(source: 'P_LEE_JM', target: 'C_045660', type: 'POLICY_THEME', label: 'CEO포럼 연계', weight: 0.90, evidence: '2024년 사업보고서 기준 성남 CEO포럼 연계 공시', sourceUrl: 'https://dart.fss.or.kr'),
+        SynapseEdgeModel(source: 'P_LEE_JM', target: 'C_025950', type: 'HOMETOWN_FRIEND', label: '안동 동향', weight: 0.85, evidence: '2024년 사업보고서 기준 본사 소재지 및 동향 연계', sourceUrl: 'https://dart.fss.or.kr'),
+      ],
+    );
   }
 
   // Mock Fallbacks with 100% Real Data

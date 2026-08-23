@@ -7,7 +7,6 @@ from app.presentation.dependencies import deep_dive_path_use_case
 router = APIRouter()
 
 @router.get("/relations/detail", response_model=DeepDivePathResponseDto, summary="Tier 2: 인물-주식 간 투자 연관성 심층 리포트 (Investment Rationale)")
-@router.get("/network/path", response_model=DeepDivePathResponseDto, summary="마인드맵 전체 서브그래프 경로 (Alias)")
 def get_relation_detail(
     source_id: Optional[str] = Query(None, description="인물 ID"),
     target_id: Optional[str] = Query(None, description="기업 ID 또는 티커"),

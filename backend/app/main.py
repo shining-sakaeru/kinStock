@@ -8,6 +8,7 @@ from app.presentation.api.v1.figures_router import router as figures_router
 from app.presentation.api.v1.stocks_router import router as stocks_router
 from app.presentation.api.v1.relations_router import router as relations_router
 from app.presentation.api.v1.weights_router import router as weights_router
+from app.presentation.api.v1.network_router import router as network_router
 
 app = FastAPI(
     title="KinStock Clean Architecture API",
@@ -30,6 +31,7 @@ app.include_router(figures_router, prefix="/api/v1", tags=["Figures & Mode A Per
 app.include_router(stocks_router, prefix="/api/v1", tags=["Stocks & Mode B Stock-Hub"])
 app.include_router(relations_router, prefix="/api/v1", tags=["Tier 2 Relations & Rationale"])
 app.include_router(weights_router, prefix="/api/v1", tags=["Weights & Baseline"])
+app.include_router(network_router, prefix="/api/v1", tags=["Synapse Network"])
 
 # 2. Mount Flutter Web SPA (All-in-One single port hosting for Mobile / Tunnels)
 current_dir = os.path.dirname(os.path.abspath(__file__))

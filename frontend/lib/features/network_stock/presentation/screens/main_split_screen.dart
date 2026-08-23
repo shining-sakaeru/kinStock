@@ -11,18 +11,19 @@ import '../../data/models/recommendation_model.dart';
 import '../../data/models/stock_related_figures_model.dart';
 import '../../data/models/weight_settings_model.dart';
 import '../../data/models/search_model.dart';
+import '../../data/models/synapse_network_model.dart';
 import '../widgets/universal_search_bar.dart';
 import '../widgets/theme_selector_bar.dart';
 import '../widgets/key_figures_carousel.dart';
 import '../widgets/stock_selector_carousel.dart';
 import '../widgets/micro_radial_graph_view.dart';
+import '../widgets/synapse_graph_canvas.dart';
 import '../widgets/ranked_stock_table.dart';
 import '../widgets/ranked_figures_table.dart';
 import '../widgets/weight_settings_sheet.dart';
 import '../widgets/investment_rationale_sheet.dart';
-import 'detail_network_screen.dart';
 
-enum FocusMode { personCentric, stockCentric, themePreset }
+enum FocusMode { personCentric, stockCentric, synapseGraph, themePreset }
 
 class MainSplitScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -49,6 +50,9 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
 
   // Theme-Preset (Mode C) Data
   ThemeClusterModel? _themeCluster;
+
+  // Synapse Subgraph Data
+  SynapseSubgraphModel? _synapseSubgraph;
 
   // Common States
   WeightSettingsModel _weights = WeightSettingsModel();
@@ -125,9 +129,11 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         themeId: themeId ?? _selectedTheme?.id,
         weights: _weights,
       );
+      final synapse = await widget.apiClient.getPersonNetwork(figureId);
       setState(() {
         _microGraph = result.microGraph;
         _recommendations = result.recommendations;
+        _synapseSubgraph = synapse;
         _isLoading = false;
       });
     } catch (e) {
@@ -145,9 +151,11 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         stockIdOrTicker,
         weights: _weights,
       );
+      final synapse = await widget.apiClient.getCompanyNetwork(stockIdOrTicker);
       setState(() {
         _microGraph = result.microGraph;
         _stockRelatedFigures = result.relatedFigures;
+        _synapseSubgraph = synapse;
         _isLoading = false;
       });
     } catch (e) {
@@ -186,6 +194,12 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         _loadStockFigures(_selectedStock!.ticker);
       } else if (mode == FocusMode.themePreset && _selectedTheme != null) {
         _loadThemeCluster(_selectedTheme!.id);
+      } else if (mode == FocusMode.synapseGraph) {
+        if (_selectedFigure != null) {
+          _loadFigureStocks(_selectedFigure!.id);
+        } else if (_selectedStock != null) {
+          _loadStockFigures(_selectedStock!.ticker);
+        }
       }
     }
   }
@@ -440,7 +454,7 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
                   onItemSelected: _onUniversalSearchSelected,
                 ),
 
-                // 2. iOS Segmented Control
+                // 2. iOS Segmented Control (4 Modes: Person, Stock, Synapse, Theme)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -450,33 +464,44 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
                     thumbColor: AppleColors.label,
                     children: {
                       FocusMode.personCentric: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           '인물 중심',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: _focusMode == FocusMode.personCentric ? AppleColors.systemBackground : AppleColors.label,
                           ),
                         ),
                       ),
                       FocusMode.stockCentric: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           '주식 중심',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: _focusMode == FocusMode.stockCentric ? AppleColors.systemBackground : AppleColors.label,
                           ),
                         ),
                       ),
+                      FocusMode.synapseGraph: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Text(
+                          '시냅스 뷰',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: _focusMode == FocusMode.synapseGraph ? AppleColors.systemBackground : AppleColors.label,
+                          ),
+                        ),
+                      ),
                       FocusMode.themePreset: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                         child: Text(
                           '테마 클러스터',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: _focusMode == FocusMode.themePreset ? AppleColors.systemBackground : AppleColors.label,
                           ),
@@ -490,7 +515,7 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
                 ),
 
                 // 3. Horizontal Filter Pills
-                if (_focusMode == FocusMode.personCentric) ...[
+                if (_focusMode == FocusMode.personCentric || _focusMode == FocusMode.synapseGraph) ...[
                   ThemeSelectorBar(
                     themes: _themes,
                     selectedTheme: _selectedTheme,
@@ -523,82 +548,90 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
 
                 const Divider(height: 1, color: AppleColors.separator),
 
-                // 4. Main Body: Clean Radar Card + Grouped Inset Table
+                // 4. Main Body: Synapse Canvas or Standard Split Table
                 Expanded(
                   child: _isLoading
                       ? const Center(
                           child: CupertinoActivityIndicator(radius: 12),
                         )
-                      : Column(
-                          children: [
-                            // Micro Radar Card (Fixed 130px height, non-overlapping)
-                            Container(
-                              height: 130,
-                              margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                              decoration: BoxDecoration(
-                                color: AppleColors.secondarySystemBackground,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppleColors.separator, width: 0.8),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned(
-                                    top: 8,
-                                    left: 12,
-                                    child: Text(
-                                      _focusMode == FocusMode.personCentric
-                                          ? '${_selectedFigure?.name ?? "인물"} 핵심 연관망'
-                                          : _focusMode == FocusMode.stockCentric
-                                              ? '${_selectedStock?.name ?? "기업"} 연관 인물망'
-                                              : '${_selectedTheme?.shortTitle ?? "테마"} 네트워크',
-                                      style: const TextStyle(
-                                        color: AppleColors.tertiaryLabel,
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                      : _focusMode == FocusMode.synapseGraph
+                          ? (_synapseSubgraph != null
+                              ? SynapseGraphCanvas(
+                                  subgraph: _synapseSubgraph!,
+                                )
+                              : const Center(
+                                  child: Text('시냅스 네트워크 데이터를 불러오는 중...', style: TextStyle(color: AppleColors.secondaryLabel)),
+                                ))
+                          : Column(
+                              children: [
+                                // Micro Radar Card (Fixed 130px height, non-overlapping)
+                                Container(
+                                  height: 130,
+                                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                                  decoration: BoxDecoration(
+                                    color: AppleColors.secondarySystemBackground,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppleColors.separator, width: 0.8),
                                   ),
-                                  if (_microGraph != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: MicroRadialGraphView(
-                                        centerPerson: _focusMode == FocusMode.personCentric
-                                            ? _selectedFigure
-                                            : null,
-                                        centerCompany: _focusMode == FocusMode.stockCentric
-                                            ? _selectedStock
-                                            : null,
-                                        radialNodes: _microGraph!.radialNodes,
-                                        onNodeTap: _onRadialNodeTapped,
+                                  child: Stack(
+                                    children: [
+                                      Positioned(
+                                        top: 8,
+                                        left: 12,
+                                        child: Text(
+                                          _focusMode == FocusMode.personCentric
+                                              ? '${_selectedFigure?.name ?? "인물"} 핵심 연관망'
+                                              : _focusMode == FocusMode.stockCentric
+                                                  ? '${_selectedStock?.name ?? "기업"} 연관 인물망'
+                                                  : '${_selectedTheme?.shortTitle ?? "테마"} 네트워크',
+                                          style: const TextStyle(
+                                            color: AppleColors.tertiaryLabel,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
-                                    )
-                                  else
-                                    const Center(
-                                      child: Text(
-                                        '연관 네트워크 데이터가 없습니다.',
-                                        style: TextStyle(color: AppleColors.tertiaryLabel, fontSize: 12),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-
-                            // Inset Grouped Table
-                            Expanded(
-                              child: _focusMode == FocusMode.personCentric
-                                  ? RankedStockTable(
-                                      recommendations: _recommendations,
-                                      onStockTap: _onStockSelected,
-                                    )
-                                  : _focusMode == FocusMode.stockCentric
-                                      ? RankedFiguresTable(
-                                          figures: _stockRelatedFigures,
-                                          onFigureTap: _onFigureSelectedFromStock,
+                                      if (_microGraph != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8.0),
+                                          child: MicroRadialGraphView(
+                                            centerPerson: _focusMode == FocusMode.personCentric
+                                                ? _selectedFigure
+                                                : null,
+                                            centerCompany: _focusMode == FocusMode.stockCentric
+                                                ? _selectedStock
+                                                : null,
+                                            radialNodes: _microGraph!.radialNodes,
+                                            onNodeTap: _onRadialNodeTapped,
+                                          ),
                                         )
-                                      : _buildThemePresetClusterView(),
+                                      else
+                                        const Center(
+                                          child: Text(
+                                            '연관 네트워크 데이터가 없습니다.',
+                                            style: TextStyle(color: AppleColors.tertiaryLabel, fontSize: 12),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Inset Grouped Table
+                                Expanded(
+                                  child: _focusMode == FocusMode.personCentric
+                                      ? RankedStockTable(
+                                          recommendations: _recommendations,
+                                          onStockTap: _onStockSelected,
+                                        )
+                                      : _focusMode == FocusMode.stockCentric
+                                          ? RankedFiguresTable(
+                                              figures: _stockRelatedFigures,
+                                              onFigureTap: _onFigureSelectedFromStock,
+                                            )
+                                          : _buildThemePresetClusterView(),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
                 ),
               ],
             ),
