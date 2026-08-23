@@ -36,6 +36,11 @@ class SynapseEvidenceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLegal = edge.sourceTier == 'TIER_1_LEGAL';
+    final badgeColor = isLegal
+        ? AppleColors.systemGreen
+        : (edge.sourceTier == 'TIER_2_PUBLIC' ? AppleColors.systemBlue : AppleColors.systemOrange);
+
     return Container(
       decoration: const BoxDecoration(
         color: AppleColors.secondarySystemBackground,
@@ -67,16 +72,16 @@ class SynapseEvidenceSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Header: Connection Title
+          // Header: Connection Title + Provenance Tier Badge
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppleColors.systemGreen.withOpacity(0.15),
+                  color: badgeColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(CupertinoIcons.link, color: AppleColors.systemGreen, size: 20),
+                child: Icon(CupertinoIcons.link, color: badgeColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -94,13 +99,30 @@ class SynapseEvidenceSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '연관도 스코어: ${(edge.weight * 100).toStringAsFixed(0)}점 · ${edge.label}',
+                      '연관도: ${(edge.weight * 100).toStringAsFixed(0)}점 · ${edge.label}',
                       style: const TextStyle(
                         color: AppleColors.secondaryLabel,
                         fontSize: 12,
                       ),
                     ),
                   ],
+                ),
+              ),
+              // Source Tier Badge (🟢 공시 팩트 / 🟡 언론 보도)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: badgeColor.withOpacity(0.4), width: 0.5),
+                ),
+                child: Text(
+                  edge.badgeLabel,
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -121,12 +143,12 @@ class SynapseEvidenceSheet extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(CupertinoIcons.checkmark_shield_fill, color: AppleColors.systemBlue, size: 15),
+                    Icon(CupertinoIcons.checkmark_shield_fill, color: badgeColor, size: 15),
                     const SizedBox(width: 6),
                     Text(
-                      'DART 전자공시 팩트 검증 근거',
+                      '${edge.sourceName} 출처 팩트 검증 근거',
                       style: TextStyle(
-                        color: AppleColors.systemBlue.withOpacity(0.9),
+                        color: badgeColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -147,7 +169,7 @@ class SynapseEvidenceSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // DART Filing Button
+          // DART / Document Link Button
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -167,7 +189,7 @@ class SynapseEvidenceSheet extends StatelessWidget {
                   Icon(CupertinoIcons.doc_text, size: 16, color: Colors.white),
                   SizedBox(width: 8),
                   Text(
-                    'DART 공시 원문 검증 보기',
+                    '출처 공시/문서 원문 검증 보기',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

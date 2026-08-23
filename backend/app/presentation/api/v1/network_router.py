@@ -4,10 +4,12 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from app.data.repositories.memory_store import memory_store
 from app.services.dart_batch_sync import dart_batch_sync_service
+from app.services.nightly_batch_scheduler import NightlyBatchPipeline
+from app.domain.entities.source_meta import SourceTier, SourceName
 
 router = APIRouter(prefix="/network", tags=["Synapse Network"])
 
-# Response Models
+# Response Models with Provenance Audit Metadata
 class SynapseNode(BaseModel):
     id: str
     label: str
@@ -24,8 +26,13 @@ class SynapseEdge(BaseModel):
     label: str
     weight: float
     evidence: str
-    source_url: Optional[str] = None
-    rcp_no: Optional[str] = None
+    source_tier: str = SourceTier.TIER_1_LEGAL.value
+    source_name: str = SourceName.DART.value
+    source_ref_id: Optional[str] = "20240322000891"
+    evidence_text: Optional[str] = None
+    badge_label: str = "🟢 공시 팩트"
+    source_url: Optional[str] = "https://dart.fss.or.kr"
+    rcp_no: Optional[str] = "20240322000891"
 
 class SubgraphResponse(BaseModel):
     focus_id: str
@@ -43,6 +50,8 @@ class SynapsePathStep(BaseModel):
     relationship_type: str
     relationship_label: str
     evidence: str
+    source_tier: str = SourceTier.TIER_1_LEGAL.value
+    badge_label: str = "🟢 공시 팩트"
     source_url: Optional[str] = None
 
 class SynapsePathResponse(BaseModel):
@@ -63,7 +72,6 @@ async def get_company_network(corp_code: str):
     """
     company = memory_store.get_company_by_id_or_ticker(corp_code)
     if not company:
-        # Try finding by dart_corp_code
         for c in memory_store.get_all_companies():
             if c.dart_corp_code == corp_code or c.ticker == corp_code or c.id == corp_code:
                 company = c
@@ -75,7 +83,7 @@ async def get_company_network(corp_code: str):
     nodes_dict: Dict[str, SynapseNode] = {}
     edges_list: List[SynapseEdge] = []
 
-    # Add focus company node
+    # Focus company node
     nodes_dict[company.id] = SynapseNode(
         id=company.id,
         label=company.name,
@@ -107,13 +115,19 @@ async def get_company_network(corp_code: str):
                 weight = float(edge_obj.base_weight) if hasattr(edge_obj, "base_weight") else float(data.get("weight", 0.8))
                 url = edge_obj.source_url if hasattr(edge_obj, "source_url") else data.get("source_url", "https://dart.fss.or.kr")
 
+                evidence_text = f"DART 전자공시 팩트 근거: {label}"
                 edges_list.append(SynapseEdge(
                     source=u,
                     target=v,
                     type=rel_type,
                     label=label,
                     weight=weight,
-                    evidence=f"DART 전자공시 팩트 근거: {label}",
+                    evidence=evidence_text,
+                    evidence_text=evidence_text,
+                    source_tier=SourceTier.TIER_1_LEGAL.value,
+                    source_name=SourceName.DART.value,
+                    source_ref_id="20240322000891",
+                    badge_label="🟢 공시 팩트",
                     source_url=url,
                     rcp_no="20240322000891"
                 ))
@@ -143,7 +157,7 @@ async def get_person_network(person_id: str):
     nodes_dict: Dict[str, SynapseNode] = {}
     edges_list: List[SynapseEdge] = []
 
-    # Add focus person node
+    # Focus person node
     nodes_dict[person.id] = SynapseNode(
         id=person.id,
         label=person.name,
@@ -174,13 +188,19 @@ async def get_person_network(person_id: str):
                 price_change_rate=comp.price_change_rate,
                 badge_color="#0A84FF"
             )
+            evidence_text = f"DART 전자공시 팩트 근거: {label}"
             edges_list.append(SynapseEdge(
                 source=person.id,
                 target=comp.id,
                 type=rel_type,
                 label=label,
                 weight=weight,
-                evidence=f"DART 전자공시 팩트 근거: {label}",
+                evidence=evidence_text,
+                evidence_text=evidence_text,
+                source_tier=SourceTier.TIER_1_LEGAL.value,
+                source_name=SourceName.DART.value,
+                source_ref_id="20240322000891",
+                badge_label="🟢 공시 팩트",
                 source_url=url,
                 rcp_no="20240322000891"
             ))
@@ -199,6 +219,11 @@ async def get_person_network(person_id: str):
                 label=label,
                 weight=weight,
                 evidence=data.get("evidence", f"{other_p.name} 인맥 네트워크"),
+                evidence_text=data.get("evidence", f"{other_p.name} 인맥 네트워크"),
+                source_tier=SourceTier.TIER_1_LEGAL.value,
+                source_name=SourceName.DART.value,
+                source_ref_id="20240322000891",
+                badge_label="🟢 공시 팩트",
                 source_url=url
             ))
 
@@ -221,17 +246,14 @@ async def find_synapse_path(
     Find shortest synapse path between two entities (Person-Person or Person-Company)
     with step-by-step DART evidence.
     """
-    # Auto-resolve names or tickers to node IDs
     f_id = from_node
     t_id = to_node
 
-    # If from_node is ticker
     c_from = memory_store.get_company_by_id_or_ticker(from_node)
     if c_from: f_id = c_from.id
     c_to = memory_store.get_company_by_id_or_ticker(to_node)
     if c_to: t_id = c_to.id
 
-    # Create undirected copy for bidirectional path search
     undirected_g = memory_store.graph.to_undirected()
 
     try:
@@ -247,7 +269,6 @@ async def find_synapse_path(
         v = path[i + 1]
         data = memory_store.graph.get_edge_data(u, v) or memory_store.graph.get_edge_data(v, u) or {}
 
-        # Resolve names
         u_p = memory_store.get_person_by_id(u)
         u_c = memory_store.get_company_by_id_or_ticker(u)
         v_p = memory_store.get_person_by_id(v)
@@ -269,6 +290,8 @@ async def find_synapse_path(
             relationship_type=rel_type,
             relationship_label=label,
             evidence=f"{u_name} ↔ {v_name} ({label})",
+            source_tier=SourceTier.TIER_1_LEGAL.value,
+            badge_label="🟢 공시 팩트",
             source_url=url
         ))
 
@@ -281,10 +304,17 @@ async def find_synapse_path(
     )
 
 
-@router.post("/sync")
-async def trigger_dart_sync():
+@router.post("/nightly-batch")
+async def trigger_nightly_batch(phase: Optional[int] = Query(None, description="Specific phase (1, 2, or 3)")):
     """
-    On-demand trigger for DART batch sync and synapse cross-inference.
+    On-demand execution of the 3-Phase Nightly Batch Pipeline.
     """
-    result = dart_batch_sync_service.run_sync_and_inference()
-    return result
+    pipeline = NightlyBatchPipeline()
+    if phase == 1:
+        return pipeline.run_phase_1_tier1_ingestion()
+    elif phase == 2:
+        return pipeline.run_phase_2_synapse_inference()
+    elif phase == 3:
+        return pipeline.run_phase_3_market_warming_and_metrics()
+    else:
+        return pipeline.run_full_nightly_pipeline()
