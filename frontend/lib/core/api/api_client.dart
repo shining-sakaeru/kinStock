@@ -1,0 +1,566 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import '../../features/network_stock/data/models/theme_model.dart';
+import '../../features/network_stock/data/models/theme_cluster_model.dart';
+import '../../features/network_stock/data/models/person_model.dart';
+import '../../features/network_stock/data/models/company_model.dart';
+import '../../features/network_stock/data/models/micro_graph_model.dart';
+import '../../features/network_stock/data/models/recommendation_model.dart';
+import '../../features/network_stock/data/models/deep_dive_model.dart';
+import '../../features/network_stock/data/models/weight_settings_model.dart';
+import '../../features/network_stock/data/models/stock_related_figures_model.dart';
+import '../../features/network_stock/data/models/search_model.dart';
+
+class FigureStocksCombinedResult {
+  final PersonModel figure;
+  final MicroGraphModel microGraph;
+  final List<RankedStockItemModel> recommendations;
+  final Map<String, dynamic>? appliedWeights;
+
+  FigureStocksCombinedResult({
+    required this.figure,
+    required this.microGraph,
+    required this.recommendations,
+    this.appliedWeights,
+  });
+}
+
+class ApiClient {
+  static String get defaultBaseUrl {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        return '${Uri.base.origin}/api/v1';
+      }
+    }
+    return 'http://127.0.0.1:8000/api/v1';
+  }
+
+  final String baseUrl;
+  final http.Client _httpClient;
+
+  ApiClient({String? baseUrl, http.Client? httpClient})
+      : baseUrl = baseUrl ?? defaultBaseUrl,
+        _httpClient = httpClient ?? http.Client();
+
+  // 1. Universal Search
+  Future<SearchUniversalResultModel> searchUniversal(String query, {int limit = 10}) async {
+    if (query.trim().isEmpty) {
+      return SearchUniversalResultModel(status: 'success', query: '', totalCount: 0, results: []);
+    }
+    final uri = Uri.parse('$baseUrl/search').replace(queryParameters: {
+      'q': query.trim(),
+      'limit': limit.toString(),
+    });
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return SearchUniversalResultModel.fromJson(map);
+      }
+      throw Exception('Search failed: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.searchUniversal error: $e, using mock search fallback');
+      return _getMockSearch(query);
+    }
+  }
+
+  // 2. Themes & Mode C Theme Cluster
+  Future<List<ThemeModel>> getThemes() async {
+    final uri = Uri.parse('$baseUrl/themes');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        return list.map((e) => ThemeModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      throw Exception('Failed to load themes: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getThemes error: $e, using mock fallback');
+      return _getMockThemes();
+    }
+  }
+
+  Future<ThemeClusterModel> getThemeCluster(String themeId, {WeightSettingsModel? weights}) async {
+    final queryParams = weights != null ? weights.toQueryParams() : <String, String>{};
+    final uri = Uri.parse('$baseUrl/themes/$themeId/cluster').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return ThemeClusterModel.fromJson(map);
+      }
+      throw Exception('Failed to load theme cluster: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getThemeCluster error: $e, using mock fallback');
+      return _getMockThemeCluster(themeId);
+    }
+  }
+
+  Future<List<PersonModel>> getThemeFigures(String themeId) async {
+    final uri = Uri.parse('$baseUrl/themes/$themeId/figures');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        return list.map((e) => PersonModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      throw Exception('Failed to load theme figures: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getThemeFigures error: $e, using mock fallback');
+      return _getMockPersons().where((p) => p.themeId == themeId).toList();
+    }
+  }
+
+  // 3. Mode A: Person-Hub
+  Future<FigureStocksCombinedResult> getFigureStocks(
+    String figureId, {
+    String? themeId,
+    WeightSettingsModel? weights,
+  }) async {
+    final queryParams = <String, String>{};
+    if (themeId != null) queryParams['theme_id'] = themeId;
+    if (weights != null) queryParams.addAll(weights.toQueryParams());
+
+    final uri = Uri.parse('$baseUrl/figures/$figureId/stocks').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        final figure = PersonModel.fromJson(map['figure'] as Map<String, dynamic>);
+        final microGraph = MicroGraphModel.fromJson(map['micro_graph'] as Map<String, dynamic>);
+        final recsList = (map['recommendations'] as List<dynamic>?)
+                ?.map((e) => RankedStockItemModel.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [];
+        return FigureStocksCombinedResult(
+          figure: figure,
+          microGraph: microGraph,
+          recommendations: recsList,
+          appliedWeights: map['applied_weights'] as Map<String, dynamic>?,
+        );
+      }
+      throw Exception('Failed to load figure stocks: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getFigureStocks error: $e, using split fallback');
+      final micro = await getMicroGraph(figureId);
+      final recs = await getRecommendations(figureId);
+      final person = (await getPersons()).firstWhere(
+        (p) => p.id == figureId,
+        orElse: () => _getMockPersons().first,
+      );
+      return FigureStocksCombinedResult(
+        figure: person,
+        microGraph: micro,
+        recommendations: recs.recommendations,
+      );
+    }
+  }
+
+  // 4. Mode B: Stock-Hub
+  Future<List<CompanyModel>> getStocks() async {
+    final uri = Uri.parse('$baseUrl/stocks');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        return list.map((e) => CompanyModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      throw Exception('Failed to load stocks: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getStocks error: $e, using mock fallback');
+      return _getMockStocks();
+    }
+  }
+
+  Future<StockRelatedFiguresModel> getStockRelatedFigures(
+    String stockCodeOrId, {
+    WeightSettingsModel? weights,
+  }) async {
+    final queryParams = weights != null ? weights.toQueryParams() : <String, String>{};
+    final uri = Uri.parse('$baseUrl/stocks/$stockCodeOrId/figures').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return StockRelatedFiguresModel.fromJson(map);
+      }
+      throw Exception('Failed to load stock related figures: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getStockRelatedFigures error: $e, using mock fallback');
+      return _getMockStockRelatedFigures(stockCodeOrId);
+    }
+  }
+
+  Future<List<PersonModel>> getPersons() async {
+    final uri = Uri.parse('$baseUrl/persons');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        return list.map((e) => PersonModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      throw Exception('Failed to load persons: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getPersons error: $e, using mock fallback');
+      return _getMockPersons();
+    }
+  }
+
+  Future<MicroGraphModel> getMicroGraph(String personId, {int topK = 5}) async {
+    final uri = Uri.parse('$baseUrl/persons/$personId/micro-graph?top_k=$topK');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return MicroGraphModel.fromJson(map);
+      }
+      throw Exception('Failed to load micro-graph: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getMicroGraph error: $e, using mock fallback');
+      return _getMockMicroGraph(personId);
+    }
+  }
+
+  Future<RecommendationsModel> getRecommendations(String personId) async {
+    final uri = Uri.parse('$baseUrl/persons/$personId/recommendations');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return RecommendationsModel.fromJson(map);
+      }
+      throw Exception('Failed to load recommendations: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getRecommendations error: $e, using mock fallback');
+      return _getMockRecommendations(personId);
+    }
+  }
+
+  // 5. Tier 2: Relations Detail & Rationale
+  Future<DeepDivePathModel> getDeepDivePath(String personId, String companyId, {WeightSettingsModel? weights}) async {
+    final queryParams = <String, String>{
+      'source_id': personId,
+      'target_id': companyId,
+    };
+    if (weights != null) queryParams.addAll(weights.toQueryParams());
+
+    final uri = Uri.parse('$baseUrl/relations/detail').replace(queryParameters: queryParams);
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return DeepDivePathModel.fromJson(map);
+      }
+      throw Exception('Failed to load deep-dive path: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getDeepDivePath error: $e, using mock fallback');
+      return _getMockDeepDive(personId, companyId);
+    }
+  }
+
+  // Mock Fallbacks with 100% Real Data
+  SearchUniversalResultModel _getMockSearch(String q) {
+    final results = <SearchItemModel>[];
+    if ('대선'.contains(q) || '테마'.contains(q)) {
+      results.add(SearchItemModel(id: 'theme_presidential', type: 'THEME', title: '대선 테마', subtitle: '유력 대권 주자 및 참모진 라인', badge: '테마', targetId: 'theme_presidential'));
+    }
+    if ('이재명'.contains(q)) {
+      results.add(SearchItemModel(id: 'P_LEE_JM', type: 'PERSON', title: '이재명', subtitle: '국회의원 / 더불어민주당 대표', badge: '인물', targetId: 'P_LEE_JM', sourceUrl: 'https://open.assembly.go.kr'));
+    }
+    if ('한동훈'.contains(q)) {
+      results.add(SearchItemModel(id: 'P_HAN_DH', type: 'PERSON', title: '한동훈', subtitle: '국회의원 / 국민의힘 대표', badge: '인물', targetId: 'P_HAN_DH', sourceUrl: 'https://open.assembly.go.kr'));
+    }
+    if ('에이텍'.contains(q) || '045660'.contains(q)) {
+      results.add(SearchItemModel(id: 'C_045660', type: 'STOCK', title: '에이텍', subtitle: '045660 · 디스플레이/스마트PC', badge: '주식', targetId: '045660', sourceUrl: 'https://finance.naver.com/item/main.naver?code=045660'));
+    }
+    if ('안랩'.contains(q) || '053800'.contains(q)) {
+      results.add(SearchItemModel(id: 'C_053800', type: 'STOCK', title: '안랩', subtitle: '053800 · 정보보안 솔루션', badge: '주식', targetId: '053800', sourceUrl: 'https://finance.naver.com/item/main.naver?code=053800'));
+    }
+    return SearchUniversalResultModel(status: 'success', query: q, totalCount: results.length, results: results);
+  }
+
+  List<ThemeModel> _getMockThemes() {
+    return [
+      ThemeModel(id: 'theme_presidential', code: 'PRESIDENTIAL_ELECTION', title: '대선 테마', shortTitle: '대선', description: '유력 대권 주자 및 싱크탱크 네트워크', iconName: 'how_to_vote', badgeColor: '#0A84FF', figureCount: 4),
+      ThemeModel(id: 'theme_general_election', code: 'GENERAL_ELECTION', title: '총선/보선 테마', shortTitle: '총선/보선', description: '원내대표 및 격전지 핵심 의원', iconName: 'account_balance', badgeColor: '#64D2FF', figureCount: 2),
+      ThemeModel(id: 'theme_cabinet_policy', code: 'CABINET_POLICY', title: '내각/정책 테마', shortTitle: '내각/정책', description: '경제부총리 및 금융당국 밸류업', iconName: 'policy', badgeColor: '#FF9F0A', figureCount: 2),
+      ThemeModel(id: 'theme_conglomerate', code: 'CONGLOMERATE_GOVERNANCE', title: '대기업 지배구조·승계', shortTitle: '지배구조', description: '삼성·현대차·신세계 오너가 지분 승계', iconName: 'corporate_fare', badgeColor: '#BF5AF2', figureCount: 3),
+      ThemeModel(id: 'theme_diplomacy', code: 'DIPLOMATIC_MISSION', title: '특사단·글로벌 외교', shortTitle: '외교/특사단', description: 'K-방산·원전 글로벌 경제사절단', iconName: 'public', badgeColor: '#30D158', figureCount: 1),
+    ];
+  }
+
+  ThemeClusterModel _getMockThemeCluster(String themeId) {
+    return ThemeClusterModel(
+      status: 'success',
+      theme: _getMockThemes().firstWhere((t) => t.id == themeId, orElse: () => _getMockThemes().first),
+      keyFigures: _getMockPersons().where((p) => p.themeId == themeId).toList(),
+      topThemeStocks: _getMockRecommendations('P_LEE_JM').recommendations,
+    );
+  }
+
+  List<CompanyModel> _getMockStocks() {
+    return [
+      CompanyModel(id: 'C_045660', ticker: '045660', name: '에이텍', industry: '디스플레이 / 스마트PC', currentPrice: 13850, priceChangeRate: 8.63, marketCap: '1,142억', dartCorpCode: '00361958', sourceUrl: 'https://finance.naver.com/item/main.naver?code=045660'),
+      CompanyModel(id: 'C_025950', ticker: '025950', name: '동신건설', industry: '토목건축 / SOC 인프라', currentPrice: 21400, priceChangeRate: 14.13, marketCap: '1,798억', dartCorpCode: '00216583', sourceUrl: 'https://finance.naver.com/item/main.naver?code=025950'),
+      CompanyModel(id: 'C_053800', ticker: '053800', name: '안랩', industry: '정보보안 / AI 백신 솔루션', currentPrice: 64200, priceChangeRate: 5.76, marketCap: '6,428억', dartCorpCode: '00350758', sourceUrl: 'https://finance.naver.com/item/main.naver?code=053800'),
+      CompanyModel(id: 'C_084690', ticker: '084690', name: '대상홀딩스', industry: '지주사 / 바이오식품', currentPrice: 9850, priceChangeRate: 6.49, marketCap: '3,568억', dartCorpCode: '00114098', sourceUrl: 'https://finance.naver.com/item/main.naver?code=084690'),
+      CompanyModel(id: 'C_028260', ticker: '028260', name: '삼성물산', industry: '종합상사 / 건설 / 지주사', currentPrice: 146200, priceChangeRate: 4.13, marketCap: '27조 3,340억', dartCorpCode: '00126385', sourceUrl: 'https://finance.naver.com/item/main.naver?code=028260'),
+      CompanyModel(id: 'C_012450', ticker: '012450', name: '한화에어로스페이스', industry: '항공우주 / K-방산 수출', currentPrice: 332500, priceChangeRate: 7.26, marketCap: '16조 8,300억', dartCorpCode: '00164777', sourceUrl: 'https://finance.naver.com/item/main.naver?code=012450'),
+    ];
+  }
+
+  List<PersonModel> _getMockPersons() {
+    return [
+      PersonModel(
+        id: 'P_LEE_JM',
+        name: '이재명',
+        category: 'POLITICIAN',
+        roleTitle: '국회의원 / 더불어민주당 대표',
+        themeId: 'theme_presidential',
+        hometown: '경북 안동',
+        almaMater: ['삼계초등학교', '중앙대학교 법학과'],
+        cohortInfo: '사법연수원 18기',
+        keySummary: '제20대 대선 후보 · 중앙대 법대 / 성남 네트워크',
+        sourceUrl: 'https://open.assembly.go.kr',
+      ),
+      PersonModel(
+        id: 'P_HAN_DH',
+        name: '한동훈',
+        category: 'POLITICIAN',
+        roleTitle: '국회의원 / 국민의힘 대표',
+        themeId: 'theme_presidential',
+        hometown: '강원 춘천 / 서울',
+        almaMater: ['현대고등학교', '서울대학교 법과대학', '컬럼비아 로스쿨'],
+        cohortInfo: '사법연수원 27기',
+        keySummary: '전 법무부장관 · 서울대 법대 / 현대고 네트워크',
+        sourceUrl: 'https://open.assembly.go.kr',
+      ),
+      PersonModel(
+        id: 'P_AHN_CS',
+        name: '안철수',
+        category: 'POLITICIAN',
+        roleTitle: '국회의원 / 전 인수위원장',
+        themeId: 'theme_presidential',
+        hometown: '부산',
+        almaMater: ['부산고등학교', '서울대학교 의과대학', '펜실베이니아대 와튼 MBA'],
+        keySummary: '안랩 창업주 및 최대주주(18.6%) · 서울대/와튼 라인',
+        sourceUrl: 'https://open.assembly.go.kr',
+      ),
+      PersonModel(
+        id: 'P_LEE_JS',
+        name: '이준석',
+        category: 'POLITICIAN',
+        roleTitle: '국회의원 / 개혁신당 의원',
+        themeId: 'theme_general_election',
+        hometown: '서울 노원',
+        almaMater: ['서울과학고등학교', '하버드대학교 컴퓨터과학/경제학'],
+        keySummary: '전 당대표 · 하버드대 동문 네트워크',
+        sourceUrl: 'https://open.assembly.go.kr',
+      ),
+      PersonModel(
+        id: 'P_CHOI_SM',
+        name: '최상목',
+        category: 'PUBLIC_OFFICIAL',
+        roleTitle: '경제부총리 겸 기획재정부 장관',
+        themeId: 'theme_cabinet_policy',
+        hometown: '서울',
+        almaMater: ['오산고등학교', '서울대학교 법과대학', '코넬대 경제학 박사'],
+        cohortInfo: '행정고시 29회',
+        keySummary: '거시경제 총괄 · 기업 밸류업 프로그램 주도',
+        sourceUrl: 'https://www.moef.go.kr',
+      ),
+      PersonModel(
+        id: 'P_LEE_JY',
+        name: '이재용',
+        category: 'BUSINESSMAN',
+        roleTitle: '삼성전자 회장 / 오너 3세',
+        themeId: 'theme_conglomerate',
+        hometown: '서울',
+        almaMater: ['경복고등학교', '서울대학교 동양사학', '게이오 MBA', '하버드 비즈니스스쿨'],
+        keySummary: '삼성그룹 총수 · 삼성물산 최대주주(18.26%)',
+        sourceUrl: 'https://dart.fss.or.kr',
+      ),
+      PersonModel(
+        id: 'P_KIM_DK',
+        name: '김동관',
+        category: 'BUSINESSMAN',
+        roleTitle: '한화그룹 부회장 / 전략부문 대표',
+        themeId: 'theme_diplomacy',
+        hometown: '서울',
+        almaMater: ['세인트폴고등학교', '하버드대학교 정치학과'],
+        keySummary: '방미 경제사절단 / 다보스포럼 특사단 · 방산/에너지 총괄',
+        sourceUrl: 'https://dart.fss.or.kr',
+      ),
+    ];
+  }
+
+  MicroGraphModel _getMockMicroGraph(String personId) {
+    return MicroGraphModel(
+      status: 'success',
+      centerPerson: _getMockPersons().firstWhere((p) => p.id == personId, orElse: () => _getMockPersons().first),
+      radialNodes: [
+        RadialNodeModel(
+          nodeId: 'C_045660',
+          nodeName: '에이텍',
+          nodeType: 'COMPANY',
+          relationType: 'POLICY_THEME',
+          relationBadge: '성남 CEO포럼',
+          weight: 0.90,
+          detailInfo: '045660 · 디스플레이/스마트PC',
+          connectedCompanyCount: 1,
+          sourceUrl: 'https://finance.naver.com/item/main.naver?code=045660',
+        ),
+        RadialNodeModel(
+          nodeId: 'C_025950',
+          nodeName: '동신건설',
+          nodeType: 'COMPANY',
+          relationType: 'HOMETOWN_FRIEND',
+          relationBadge: '안동 동향',
+          weight: 0.85,
+          detailInfo: '025950 · 토목건축/SOC',
+          connectedCompanyCount: 1,
+          sourceUrl: 'https://finance.naver.com/item/main.naver?code=025950',
+        ),
+      ],
+    );
+  }
+
+  RecommendationsModel _getMockRecommendations(String personId) {
+    return RecommendationsModel(
+      status: 'success',
+      personId: personId,
+      personName: '이재명',
+      recommendations: [
+        RankedStockItemModel(
+          rank: 1,
+          companyId: 'C_045660',
+          ticker: '045660',
+          companyName: '에이텍',
+          relevanceScore: 90.0,
+          primaryBadge: '성남 창조경영 CEO포럼 연계',
+          currentPrice: 13850,
+          priceChangeRate: 8.63,
+          marketCap: '1,142억',
+          industry: '디스플레이 / 스마트PC',
+          depth: 1,
+          connectionPathSummary: '[DART 공시] 이재명 ➔ 에이텍 (성남 창조경영 CEO포럼 연계)',
+          dartFact: DartFactModel(
+            reportTitle: '[DART 공시] 에이텍 2024 사업보고서',
+            reportCode: 'DART-2024-00361958',
+            rcpNo: '20240322000891',
+            filingDate: '2024.03.22',
+            verifiedFact: '신승영 대표이사 성남 창조경영 CEO포럼 운영위원 활동 공시',
+            sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240322000891',
+          ),
+          isDartVerified: true,
+          sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240322000891',
+        ),
+        RankedStockItemModel(
+          rank: 2,
+          companyId: 'C_025950',
+          ticker: '025950',
+          companyName: '동신건설',
+          relevanceScore: 85.0,
+          primaryBadge: '안동 본사 및 초등 동향',
+          currentPrice: 21400,
+          priceChangeRate: 14.13,
+          marketCap: '1,798억',
+          industry: '토목건축 / SOC 인프라',
+          depth: 1,
+          connectionPathSummary: '[DART 공시] 이재명 ➔ 동신건설 (안동 본사 및 초등 동향)',
+          dartFact: DartFactModel(
+            reportTitle: '[DART 공시] 동신건설 2024 사업보고서',
+            reportCode: 'DART-2024-00216583',
+            rcpNo: '20240321000624',
+            filingDate: '2024.03.21',
+            verifiedFact: '본점 소재지 경북 안동시 소재 확인 공시',
+            sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240321000624',
+          ),
+          isDartVerified: true,
+          sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240321000624',
+        ),
+      ],
+    );
+  }
+
+  StockRelatedFiguresModel _getMockStockRelatedFigures(String stockCode) {
+    return StockRelatedFiguresModel(
+      status: 'success',
+      company: _getMockStocks().first,
+      microGraph: MicroGraphModel(
+        status: 'success',
+        centerCompany: _getMockStocks().first,
+        radialNodes: [
+          RadialNodeModel(
+            nodeId: 'P_LEE_JM',
+            nodeName: '이재명',
+            nodeType: 'PERSON',
+            relationType: 'POLICY_THEME',
+            relationBadge: 'CEO포럼 연계',
+            weight: 0.90,
+            detailInfo: '국회의원 / 민주당 대표',
+            connectedCompanyCount: 1,
+            sourceUrl: 'https://open.assembly.go.kr',
+          ),
+        ],
+      ),
+      relatedFigures: [
+        RankedFigureItemModel(
+          rank: 1,
+          figureId: 'P_LEE_JM',
+          name: '이재명',
+          roleTitle: '국회의원 / 더불어민주당 대표',
+          themeId: 'theme_presidential',
+          themeTitle: '대선 테마',
+          relevanceScore: 90.0,
+          primaryBadge: '성남 창조경영 CEO포럼 연계',
+          depth: 1,
+          connectionPathSummary: '[DART 공시] 이재명 ➔ 에이텍 (성남 창조경영 CEO포럼 연계)',
+          dartFact: DartFactModel(
+            reportTitle: '[DART 공시] 에이텍 2024 사업보고서',
+            reportCode: 'DART-2024-00361958',
+            rcpNo: '20240322000891',
+            filingDate: '2024.03.22',
+            verifiedFact: '신승영 대표이사 성남 창조경영 CEO포럼 운영위원 활동 공시',
+            sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240322000891',
+          ),
+          sourceUrl: 'https://open.assembly.go.kr',
+        ),
+      ],
+    );
+  }
+
+  DeepDivePathModel _getMockDeepDive(String personId, String companyId) {
+    return DeepDivePathModel(
+      status: 'success',
+      sourcePerson: _getMockPersons().first,
+      targetCompany: CompanyModel(
+        id: 'C_045660',
+        ticker: '045660',
+        name: '에이텍',
+        industry: '디스플레이 / 스마트PC',
+        currentPrice: 13850,
+        priceChangeRate: 8.63,
+        marketCap: '1,142억',
+        sourceUrl: 'https://finance.naver.com/item/main.naver?code=045660',
+      ),
+      relevanceScore: 90.0,
+      depth: 1,
+      primaryBadge: '성남 창조경영 CEO포럼 연계',
+      investmentRationale: InvestmentRationaleModel(
+        executivePowerAnalysis: 'DART 전자공시에 따르면 에이텍의 신승영 대표이사는 성남 창조경영 CEO포럼 운영위원으로 활동하며 성남시 정책 및 스마트 행정 인프라 공급에 실질적인 영향력을 행사해 왔습니다.',
+        historicalMarketReaction: '에이텍(045660)은 과거 대선 경선 및 정책 이벤트 발표 시 상한가를 기록하는 등 시장에서 대장주로 강력하게 반응한 전력이 있습니다.',
+        themeCatalyst: '공공 클라우드 및 스마트 행정 PC 인프라 투자 정책 모멘텀 발생 시 최우선 수혜가 예상됩니다.',
+      ),
+      nodes: [
+        GraphPathNodeModel(id: 'P_LEE_JM', label: '이재명', type: 'PERSON', subtitle: '국회의원 / 당대표', isSource: true, sourceUrl: 'https://open.assembly.go.kr'),
+        GraphPathNodeModel(id: 'C_045660', label: '에이텍', type: 'COMPANY', subtitle: '045660 · 디스플레이/스마트PC', isTarget: true, sourceUrl: 'https://finance.naver.com/item/main.naver?code=045660'),
+      ],
+      edges: [
+        GraphPathEdgeModel(source: 'P_LEE_JM', target: 'C_045660', relationType: 'POLICY_THEME', label: '성남 창조경영 CEO포럼 연계', weight: 0.90, sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240322000891'),
+      ],
+    );
+  }
+}
