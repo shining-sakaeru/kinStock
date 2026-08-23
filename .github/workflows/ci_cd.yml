@@ -3,8 +3,22 @@ name: KinStock CI/CD Pipeline
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'logs/**'
+      - '.gitignore'
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'logs/**'
+
+# Cancel previous in-progress runs on the same branch automatically to prevent queue accumulation
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-tests:

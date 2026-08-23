@@ -3,7 +3,17 @@ name: KinStock Production CI/CD (GitHub Actions to Oracle VM)
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'logs/**'
+      - '.gitignore'
   workflow_dispatch:
+
+# Cancel previous in-progress runs on the same branch automatically to prevent queue accumulation
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
