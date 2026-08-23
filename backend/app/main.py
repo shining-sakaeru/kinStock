@@ -12,12 +12,14 @@ from app.presentation.api.v1.relations_router import router as relations_router
 from app.presentation.api.v1.weights_router import router as weights_router
 from app.presentation.api.v1.network_router import router as network_router
 from app.services.nightly_batch_scheduler import start_apscheduler
+from app.services.seed_injector import inject_core_seed_data
 
 logger = logging.getLogger("KinStock.Main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start APScheduler for Nightly Batch (22:00 ~ 07:00)
+    # Startup: Seed core data & Start APScheduler for Nightly Batch
+    inject_core_seed_data()
     scheduler = start_apscheduler()
     logger.info("🚀 KinStock Server & Nightly Scheduler Started.")
     yield

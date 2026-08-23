@@ -221,6 +221,9 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         themeId: _selectedTheme?.id ?? 'theme_presidential',
         sourceUrl: item.sourceUrl ?? '',
       );
+      if (!_themeFigures.any((f) => f.id == match!.id)) {
+        _themeFigures.insert(0, match);
+      }
       setState(() {
         _focusMode = FocusMode.personCentric;
         _selectedFigure = match;
@@ -235,7 +238,7 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         }
       }
       match ??= CompanyModel(
-        id: item.targetId,
+        id: item.id.startsWith('C_') ? item.id : 'C_${item.targetId}',
         ticker: item.targetId,
         name: item.title,
         industry: item.subtitle,
@@ -244,6 +247,9 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         marketCap: '1,000억',
         sourceUrl: item.sourceUrl,
       );
+      if (!_stocks.any((s) => s.ticker == match!.ticker || s.id == match.id)) {
+        _stocks.insert(0, match);
+      }
       setState(() {
         _focusMode = FocusMode.stockCentric;
         _selectedStock = match;
