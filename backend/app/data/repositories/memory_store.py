@@ -153,7 +153,15 @@ class InMemoryGraphStore(PersonRepository, CompanyRepository, ThemeRepository, N
         return list(self.persons.values())
 
     def get_person_by_id(self, person_id: str) -> Optional[Person]:
-        return self.persons.get(person_id)
+        if person_id in self.persons:
+            return self.persons[person_id]
+        clean_id = person_id[2:] if person_id.startswith("P_") else f"P_{person_id}"
+        if clean_id in self.persons:
+            return self.persons[clean_id]
+        for pid, p in self.persons.items():
+            if person_id in pid or p.name == person_id or person_id in p.name:
+                return p
+        return None
 
     def get_persons_by_theme(self, theme_id: str) -> List[Person]:
         return [p for p in self.persons.values() if p.theme_id == theme_id]
@@ -173,8 +181,11 @@ class InMemoryGraphStore(PersonRepository, CompanyRepository, ThemeRepository, N
     def get_company_by_id_or_ticker(self, id_or_ticker: str) -> Optional[Company]:
         if id_or_ticker in self.companies:
             return self.companies[id_or_ticker]
-        for c in self.companies.values():
-            if c.ticker == id_or_ticker or c.id == id_or_ticker:
+        c_id = f"C_{id_or_ticker}" if not id_or_ticker.startswith("C_") else id_or_ticker
+        if c_id in self.companies:
+            return self.companies[c_id]
+        for cid, c in self.companies.items():
+            if c.ticker == id_or_ticker or c.name == id_or_ticker or c.dart_corp_code == id_or_ticker:
                 return c
         return None
 
