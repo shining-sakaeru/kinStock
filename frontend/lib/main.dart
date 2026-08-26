@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/api/api_client.dart';
 import 'core/theme/app_theme.dart';
-import 'features/network_stock/presentation/screens/main_split_screen.dart';
+import 'views/main_workspace_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,10 +16,10 @@ class KinStockApp extends StatelessWidget {
     final apiClient = ApiClient();
 
     return MaterialApp(
-      title: 'KinStock - 테마주 연관성 분석',
+      title: 'KinStock - DART 인물·기업 네트워크 그래프',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: MainSplitScreen(apiClient: apiClient),
+      home: MainWorkspaceView(apiClient: apiClient),
     );
   }
 }

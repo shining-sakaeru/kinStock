@@ -28,6 +28,8 @@ class SynapseNodeModel {
       badgeColor: json['badge_color'] as String?,
     );
   }
+  String get name => label;
+  String? get subtitle => roleOrIndustry;
 }
 
 class SynapseEdgeModel {
@@ -57,6 +59,8 @@ class SynapseEdgeModel {
     this.rcpNo,
   });
 
+  String get relationType => type;
+
   factory SynapseEdgeModel.fromJson(Map<String, dynamic> json) {
     return SynapseEdgeModel(
       source: json['source'] as String? ?? '',
@@ -73,6 +77,8 @@ class SynapseEdgeModel {
     );
   }
 }
+
+typedef SynapseNetworkModel = SynapseSubgraphModel;
 
 class SynapseSubgraphModel {
   final String focusId;

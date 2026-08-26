@@ -240,6 +240,13 @@ class ApiClient {
     }
   }
 
+  Future<SynapseNetworkModel> getSynapseNetwork(String idOrTicker) async {
+    if (idOrTicker.startsWith('P_') || idOrTicker.startsWith('P-')) {
+      return getPersonNetwork(idOrTicker);
+    }
+    return getCompanyNetwork(idOrTicker);
+  }
+
   // 7. Admin & Batch Monitoring APIs
   Future<BatchProgressModel> getBatchProgressStatus() async {
     final uri = Uri.parse('$baseUrl/admin/batch/status');
