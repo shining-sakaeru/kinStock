@@ -1,66 +1,73 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 from enum import Enum
 
-class ThemeTier(str, Enum):
-    LEADER = "LEADER"      # 🔥 1티어 대장주 (< 1000억)
-    BENEFICIARY = "BENEFICIARY" # ⚡ 2티어 수혜주 (1000억~3000억)
-    FOLLOWER = "FOLLOWER"  # 🔹 3티어 후발주 (> 3000억)
+class RoleTier(str, Enum):
+    PRIMARY_ANCHOR = "PRIMARY_ANCHOR"   # 👑 1티어 대장주
+    DIRECT_PROXY = "DIRECT_PROXY"       # ⚡ 2티어 직결 수혜주
+    NEXUS_BRIDGE = "NEXUS_BRIDGE"       # 🔗 3티어 매개주
+    SYMPATHY_FRINGE = "SYMPATHY_FRINGE" # 💨 4티어 후발주
 
-class CausalChainNode(BaseModel):
-    id: str
-    name: str
-    type: str # PERSON, COMPANY
-    role_or_title: str
-    extra_info: Optional[str] = None
+class FactorGrade(str, Enum):
+    A_PLUS = "A+"
+    A = "A"
+    B = "B"
+    C = "C"
 
-class CausalChainEdge(BaseModel):
-    from_id: str
-    to_id: str
-    relation_label: str
-    badge: str
-    evidence_text: str
-    weight: float
+class ConvictionLevel(str, Enum):
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    SPECULATIVE = "SPECULATIVE"
 
-class CausalPathChain(BaseModel):
-    source_person: CausalChainNode
-    p2p_edge: CausalChainEdge
-    intermediary_person: CausalChainNode
-    p2c_edge: CausalChainEdge
-    target_company: CausalChainNode
+class CausalMetrics(BaseModel):
+    role_tier: RoleTier
+    role_tier_label: str
+    degree_of_sep: int # 1, 2, 3
+    degree_label: str  # "1-Degree Direct (1촌 직결)"
+    factor_grade: FactorGrade
+    factor_grade_label: str
+    conviction_level: ConvictionLevel
+    conviction_label: str
+    causal_equation: str # "[사법연수원 14기 동기 (A+)] ✕ [대표이사 경영권 장악 (지분 24.5%)]"
 
-class AuditFactEvidence(BaseModel):
-    dart_filing_title: str
-    rcp_no: str
-    filing_date: str
-    verified_fact: str
-    dart_url: str
-    market_track_record: str
+class CausalPathStep(BaseModel):
+    type: str # "PERSON", "EDGE", "COMPANY"
+    name: Optional[str] = None
+    role: Optional[str] = None
+    ticker: Optional[str] = None
+    label: Optional[str] = None
+    grade: Optional[str] = None
+    delta_years: Optional[int] = None
+    influence: Optional[str] = None
+    stake_ratio: Optional[float] = None
 
-class ThemeTradingMetrics(BaseModel):
-    market_cap_str: str
+class AuditFactEvidenceV2(BaseModel):
+    source_name: str = "DART"
+    rcept_no: str
+    report_name: str
+    section: str
+    snippet: str
+    source_url: str
+    market_track_record: Optional[str] = None
+
+class CausalChainV2(BaseModel):
+    depth_1_hook: str
+    depth_2_path: List[CausalPathStep]
+    depth_3_evidence: AuditFactEvidenceV2
+
+class ThemeStockItemV2(BaseModel):
+    rank: int
+    stock_code: str
+    stock_name: str
+    industry: str
+    market_cap: str
     current_price: int
     price_change_rate: float
-    major_shareholder_ratio: float
-    floating_ratio: float
-
-class ThemeStockRankItem(BaseModel):
-    rank: int
-    ticker: str
-    company_name: str
-    industry: str
     kin_score: float # 0~100
-    theme_tier: ThemeTier
-    theme_tier_label: str
-    
-    # 3-Depth Causal Reasoning
-    depth1_hook: str                    # Depth 1: One-line hook
-    depth2_causal_chain: CausalPathChain # Depth 2: 3-step causal chain
-    depth3_evidence: AuditFactEvidence   # Depth 3: DART filing & market track record
-    
-    trading_metrics: ThemeTradingMetrics
+    metrics: CausalMetrics
+    causal_chain: CausalChainV2
 
-class PersonThemeStocksResponse(BaseModel):
+class ThemeStocksApiResponse(BaseModel):
     status: str
     person_id: str
     person_name: str
@@ -70,4 +77,4 @@ class PersonThemeStocksResponse(BaseModel):
     person_hometown: str
     total_stocks_count: int
     avg_kin_score: float
-    stocks: List[ThemeStockRankItem]
+    stocks: List[ThemeStockItemV2]

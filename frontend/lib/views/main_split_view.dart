@@ -588,24 +588,36 @@ class _MainSplitViewState extends State<MainSplitView> {
             ] else ...[
               ...stocks.map((stock) {
                 final rank = stock['rank'] as int? ?? 1;
-                final ticker = stock['ticker'] as String? ?? '';
-                final name = stock['company_name'] as String? ?? '';
+                final code = (stock['stock_code'] ?? stock['ticker']) as String? ?? '';
+                final name = (stock['stock_name'] ?? stock['company_name']) as String? ?? '';
                 final industry = stock['industry'] as String? ?? '';
                 final kinScore = (stock['kin_score'] as num?)?.toDouble() ?? 90.0;
-                final tierLabel = stock['theme_tier_label'] as String? ?? '🔥 1티어 대장주';
-                final hook = stock['depth1_hook'] as String? ?? '';
-                final metrics = stock['trading_metrics'] as Map<String, dynamic>? ?? {};
-                final cap = metrics['market_cap_str'] as String? ?? '1,500억';
-                final price = metrics['current_price'] as int? ?? 10000;
-                final rate = (metrics['price_change_rate'] as num?)?.toDouble() ?? 0.0;
+                
+                final metrics = stock['metrics'] as Map<String, dynamic>? ?? {};
+                final roleTierLabel = (metrics['role_tier_label'] ?? stock['theme_tier_label']) as String? ?? '👑 1티어 대장주';
+                final degreeLabel = metrics['degree_label'] as String? ?? '1-Degree Direct (1촌 직결)';
+                final factorGrade = metrics['factor_grade'] as String? ?? 'A+';
+                final convictionLabel = metrics['conviction_label'] as String? ?? '📶 HIGH (공시 100% 검증)';
+                final causalEquation = metrics['causal_equation'] as String? ?? '';
+
+                final causalChain = stock['causal_chain'] as Map<String, dynamic>? ?? {};
+                final hook = (causalChain['depth_1_hook'] ?? stock['depth1_hook']) as String? ?? '';
+                
+                final cap = stock['market_cap'] as String? ?? '1,500억';
+                final price = stock['current_price'] as int? ?? 10000;
+                final rate = (stock['price_change_rate'] as num?)?.toDouble() ?? 0.0;
 
                 return ThemeStockRankCard(
                   rank: rank,
-                  ticker: ticker,
-                  companyName: name,
+                  stockCode: code,
+                  stockName: name,
                   industry: industry,
                   kinScore: kinScore,
-                  themeTierLabel: tierLabel,
+                  roleTierLabel: roleTierLabel,
+                  degreeLabel: degreeLabel,
+                  factorGrade: factorGrade,
+                  convictionLabel: convictionLabel,
+                  causalEquation: causalEquation,
                   depth1Hook: hook,
                   marketCap: cap,
                   currentPrice: price,

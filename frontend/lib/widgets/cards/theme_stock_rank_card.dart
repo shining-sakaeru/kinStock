@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 
 class ThemeStockRankCard extends StatelessWidget {
   final int rank;
-  final String ticker;
-  final String companyName;
+  final String stockCode;
+  final String stockName;
   final String industry;
   final double kinScore;
-  final String themeTierLabel;
+  final String roleTierLabel;
+  final String degreeLabel;
+  final String factorGrade;
+  final String convictionLabel;
+  final String causalEquation;
   final String depth1Hook;
   final String marketCap;
   final int currentPrice;
@@ -18,11 +22,15 @@ class ThemeStockRankCard extends StatelessWidget {
   const ThemeStockRankCard({
     super.key,
     required this.rank,
-    required this.ticker,
-    required this.companyName,
+    required this.stockCode,
+    required this.stockName,
     required this.industry,
     required this.kinScore,
-    required this.themeTierLabel,
+    required this.roleTierLabel,
+    required this.degreeLabel,
+    required this.factorGrade,
+    required this.convictionLabel,
+    required this.causalEquation,
     required this.depth1Hook,
     required this.marketCap,
     required this.currentPrice,
@@ -66,7 +74,7 @@ class ThemeStockRankCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: Rank Badge + Company Name + Ticker + Tier Badge + Kin-Score
+              // Row 1: Rank Badge + Stock Name + Ticker + Role Tier Badge + Factor Grade + Kin-Score
               Row(
                 children: [
                   // Rank Circle Badge
@@ -91,13 +99,13 @@ class ThemeStockRankCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
 
-                  // Company Name & Ticker (Clickable to pivot)
+                  // Stock Name & Ticker (Clickable to pivot)
                   GestureDetector(
-                    onTap: () => onPivotToStock(ticker, companyName),
+                    onTap: () => onPivotToStock(stockCode, stockName),
                     child: Row(
                       children: [
                         Text(
-                          companyName,
+                          stockName,
                           style: const TextStyle(
                             color: Color(0xFFF8FAFC),
                             fontSize: 16,
@@ -106,25 +114,48 @@ class ThemeStockRankCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          ticker,
+                          stockCode,
                           style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
 
-                  // Theme Tier Label Badge
+                  // Role Tier Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: const Color(0xFFF59E0B)),
                     ),
                     child: Text(
-                      themeTierLabel,
+                      roleTierLabel,
                       style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Factor Grade Badge (A+, A, B)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: factorGrade.contains('A')
+                          ? const Color(0xFF10B981).withOpacity(0.2)
+                          : const Color(0xFF334155),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: factorGrade.contains('A') ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    child: Text(
+                      '등급 $factorGrade',
+                      style: TextStyle(
+                        color: factorGrade.contains('A') ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
 
@@ -185,11 +216,44 @@ class ThemeStockRankCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+
+              // Row 3: Causal Equation Bar
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(CupertinoIcons.equal_circle_fill, size: 12, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '인과 방정식: $causalEquation',
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      convictionLabel,
+                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 10),
 
-              // Row 3: Trading Metrics & Why Button
+              // Row 4: Trading Metrics & Why Trigger Link
               Row(
                 children: [
+                  Text(
+                    degreeLabel,
+                    style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 10),
                   Text(
                     '시총 $marketCap',
                     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
