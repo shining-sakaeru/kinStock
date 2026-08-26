@@ -422,14 +422,29 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
           ),
         ),
         actions: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: const Icon(
-              CupertinoIcons.chart_bar_square_fill,
-              size: 20,
-              color: AppleColors.systemGreen,
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+              color: AppleColors.systemGreen.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(8),
+              onPressed: () => AdminBatchView.show(context, widget.apiClient),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(CupertinoIcons.chart_bar_square_fill, size: 15, color: AppleColors.systemGreen),
+                  SizedBox(width: 5),
+                  Text(
+                    '배치/검증',
+                    style: TextStyle(
+                      color: AppleColors.systemGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            onPressed: () => AdminBatchView.show(context, widget.apiClient),
           ),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -441,7 +456,7 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
             onPressed: _openWeightSettings,
           ),
           CupertinoButton(
-            padding: const EdgeInsets.only(right: 12, left: 6),
+            padding: const EdgeInsets.only(right: 12, left: 4),
             child: const Icon(CupertinoIcons.arrow_clockwise, size: 20, color: AppleColors.label),
             onPressed: _loadInitialData,
           ),
