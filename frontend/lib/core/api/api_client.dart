@@ -240,13 +240,6 @@ class ApiClient {
     }
   }
 
-  Future<SynapseNetworkModel> getSynapseNetwork(String idOrTicker) async {
-    if (idOrTicker.startsWith('P_') || idOrTicker.startsWith('P-')) {
-      return getPersonNetwork(idOrTicker);
-    }
-    return getCompanyNetwork(idOrTicker);
-  }
-
   // 7. Admin & Batch Monitoring APIs
   Future<BatchProgressModel> getBatchProgressStatus() async {
     final uri = Uri.parse('$baseUrl/admin/batch/status');
@@ -349,9 +342,27 @@ class ApiClient {
     }
   }
 
+  Future<SynapseNetworkModel> getSynapseNetwork(
+    String idOrTicker, {
+    int depth = 1,
+    String perspective = 'COMPREHENSIVE',
+  }) async {
+    if (idOrTicker.startsWith('P_') || idOrTicker.startsWith('P-')) {
+      return getPersonNetwork(idOrTicker, depth: depth, perspective: perspective);
+    }
+    return getCompanyNetwork(idOrTicker, depth: depth, perspective: perspective);
+  }
+
   // 6. Synapse Network Graph APIs
-  Future<SynapseSubgraphModel> getPersonNetwork(String personId) async {
-    final uri = Uri.parse('$baseUrl/network/person/$personId');
+  Future<SynapseSubgraphModel> getPersonNetwork(
+    String personId, {
+    int depth = 1,
+    String perspective = 'COMPREHENSIVE',
+  }) async {
+    final uri = Uri.parse('$baseUrl/network/person/$personId').replace(queryParameters: {
+      'depth': depth.toString(),
+      'perspective': perspective,
+    });
     try {
       final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
@@ -365,8 +376,16 @@ class ApiClient {
     }
   }
 
-  Future<SynapseSubgraphModel> getCompanyNetwork(String corpCode) async {
-    final uri = Uri.parse('$baseUrl/network/company/$corpCode');
+  Future<SynapseSubgraphModel> getCompanyNetwork(
+    String corpCode, {
+    int depth = 1,
+    String perspective = 'COMPREHENSIVE',
+  }) async {
+    final cleanCode = corpCode.replaceAll('C_', '');
+    final uri = Uri.parse('$baseUrl/network/company/$cleanCode').replace(queryParameters: {
+      'depth': depth.toString(),
+      'perspective': perspective,
+    });
     try {
       final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
@@ -384,16 +403,20 @@ class ApiClient {
     return SynapseSubgraphModel(
       focusId: focusId,
       focusType: type,
-      totalNodes: 3,
-      totalEdges: 2,
+      totalNodes: 5,
+      totalEdges: 4,
       nodes: [
-        SynapseNodeModel(id: 'P_LEE_JM', label: '이재명', type: 'PERSON', roleOrIndustry: '국회의원 / 당대표', badgeColor: '#30D158'),
-        SynapseNodeModel(id: 'C_045660', label: '에이텍', type: 'COMPANY', roleOrIndustry: '디스플레이/스마트PC', priceChangeRate: 8.63, badgeColor: '#0A84FF'),
-        SynapseNodeModel(id: 'C_025950', label: '동신건설', type: 'COMPANY', roleOrIndustry: '토목건축/SOC', priceChangeRate: 14.13, badgeColor: '#0A84FF'),
+        SynapseNodeModel(id: '005930', label: '삼성전자', type: 'COMPANY', roleOrIndustry: '반도체 / 스마트폰', badgeColor: '#0A84FF'),
+        SynapseNodeModel(id: 'P_이재용_196806_M', label: '이재용', type: 'PERSON', roleOrIndustry: '삼성전자 회장', badgeColor: '#BF5AF2'),
+        SynapseNodeModel(id: 'P_전영현_196012_M', label: '전영현', type: 'PERSON', roleOrIndustry: 'DS부문장(부회장)', badgeColor: '#30D158'),
+        SynapseNodeModel(id: 'P_한종희_196203_M', label: '한종희', type: 'PERSON', roleOrIndustry: 'DX부문장(부회장)', badgeColor: '#30D158'),
+        SynapseNodeModel(id: 'P_최태원_196012_M', label: '최태원', type: 'PERSON', roleOrIndustry: 'SK그룹 회장', badgeColor: '#BF5AF2'),
       ],
       edges: [
-        SynapseEdgeModel(source: 'P_LEE_JM', target: 'C_045660', type: 'POLICY_THEME', label: 'CEO포럼 연계', weight: 0.90, evidence: '2024년 사업보고서 기준 성남 CEO포럼 연계 공시', sourceUrl: 'https://dart.fss.or.kr'),
-        SynapseEdgeModel(source: 'P_LEE_JM', target: 'C_025950', type: 'HOMETOWN_FRIEND', label: '안동 동향', weight: 0.85, evidence: '2024년 사업보고서 기준 본사 소재지 및 동향 연계', sourceUrl: 'https://dart.fss.or.kr'),
+        SynapseEdgeModel(source: 'P_이재용_196806_M', target: '005930', type: 'WORKS_AT', label: '회장 (책임경영)', weight: 0.98, evidence: '2024년 사업보고서 기준 회장 등재', sourceUrl: 'https://dart.fss.or.kr'),
+        SynapseEdgeModel(source: 'P_전영현_196012_M', target: '005930', type: 'WORKS_AT', label: '부회장 (DS부문장)', weight: 0.95, evidence: '2024년 사업보고서 기준 부회장 등재', sourceUrl: 'https://dart.fss.or.kr'),
+        SynapseEdgeModel(source: 'P_한종희_196203_M', target: '005930', type: 'WORKS_AT', label: '부회장 (DX부문장)', weight: 0.95, evidence: '2024년 사업보고서 기준 부회장 등재', sourceUrl: 'https://dart.fss.or.kr'),
+        SynapseEdgeModel(source: 'P_이재용_196806_M', target: 'P_최태원_196012_M', type: 'ALUMNI_WITH', label: '재계 총수 동문 (고려대/하버드 연계)', weight: 0.88, evidence: '대기업 최고위과정 및 지배구조 네트워크 연계', sourceUrl: 'https://dart.fss.or.kr'),
       ],
     );
   }

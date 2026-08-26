@@ -15,6 +15,10 @@ class NavigationController extends ChangeNotifier {
   // N-Depth Control (1-Depth, 2-Depth, 3-Depth)
   int _depthLevel = 1;
 
+  // Analysis Perspective
+  String _perspective = 'COMPREHENSIVE';
+  int? _seniorityGap;
+
   // Active Network Data
   SynapseNetworkModel? _networkData;
   SynapseNodeModel? _selectedNode;
@@ -42,6 +46,8 @@ class NavigationController extends ChangeNotifier {
   String get currentFocusName => _currentFocusName;
   String get currentFocusType => _currentFocusType;
   int get depthLevel => _depthLevel;
+  String get perspective => _perspective;
+  int? get seniorityGap => _seniorityGap;
   SynapseNetworkModel? get networkData => _networkData;
   SynapseNodeModel? get selectedNode => _selectedNode;
   SynapseEdgeModel? get selectedEdge => _selectedEdge;
@@ -64,6 +70,10 @@ class NavigationController extends ChangeNotifier {
       if (depthParam != null) {
         _depthLevel = int.tryParse(depthParam) ?? 1;
       }
+      final pParam = uri.queryParameters['perspective'];
+      if (pParam != null) {
+        _perspective = pParam;
+      }
     }
     loadNetwork();
   }
@@ -83,7 +93,7 @@ class NavigationController extends ChangeNotifier {
 
   void _updateBrowserUrl() {
     if (kIsWeb) {
-      final url = '/?node=$_currentFocusId&depth=$_depthLevel';
+      final url = '/?node=$_currentFocusId&depth=$_depthLevel&perspective=$_perspective';
       html.window.history.pushState(null, 'KinStock - $_currentFocusName', url);
     }
   }
@@ -103,7 +113,7 @@ class NavigationController extends ChangeNotifier {
     await loadNetwork();
   }
 
-  // 3. Load Synapse Network for Active Focus Node & Depth
+  // 3. Load Synapse Network for Active Focus Node, Depth, and Perspective
   Future<void> loadNetwork({bool updateUrl = true}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -111,10 +121,14 @@ class NavigationController extends ChangeNotifier {
 
     try {
       final rawId = _currentFocusId.replaceAll('C_', '');
-      final net = await apiClient.getSynapseNetwork(rawId);
+      final net = await apiClient.getSynapseNetwork(
+        rawId,
+        depth: _depthLevel,
+        perspective: _perspective,
+      );
 
-      // Depth filtering & capping at top 30 nodes to prevent node explosion
-      final cappedNodes = net.nodes.take(30).toList();
+      // Depth filtering & capping at top 40 nodes to prevent node explosion
+      final cappedNodes = net.nodes.take(40).toList();
       _networkData = SynapseNetworkModel(
         focusId: net.focusId,
         focusType: net.focusType,
@@ -143,6 +157,19 @@ class NavigationController extends ChangeNotifier {
       _errorMessage = '데이터를 불러오는 중 오류가 발생했습니다: $e';
       notifyListeners();
     }
+  }
+
+  // 4. Perspective Mode & Seniority Control
+  void setPerspective(String perspective) {
+    if (_perspective == perspective) return;
+    _perspective = perspective;
+    _updateBrowserUrl();
+    loadNetwork();
+  }
+
+  void setSeniorityGap(int? gap) {
+    _seniorityGap = gap;
+    loadNetwork();
   }
 
   // 4. Depth Level Control (1-Depth / 2-Depth / 3-Depth)

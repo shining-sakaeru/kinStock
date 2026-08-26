@@ -158,8 +158,23 @@ class _MainSplitViewState extends State<MainSplitView> {
           MultiPerspectiveSelector(
             currentPerspective: _perspective,
             selectedSeniorityGap: _seniorityGap,
-            onPerspectiveChanged: (p) => setState(() => _perspective = p),
-            onSeniorityGapChanged: (g) => setState(() => _seniorityGap = g),
+            onPerspectiveChanged: (p) {
+              setState(() => _perspective = p);
+              final modeStr = p == PerspectiveMode.alumniFocused
+                  ? 'ALUMNI_FOCUSED'
+                  : p == PerspectiveMode.legalElite
+                      ? 'LEGAL_ELITE'
+                      : p == PerspectiveMode.regionalTies
+                          ? 'REGIONAL_TIES'
+                          : p == PerspectiveMode.chaerokNetwork
+                              ? 'CHAEROK_NETWORK'
+                              : 'COMPREHENSIVE';
+              nav.setPerspective(modeStr);
+            },
+            onSeniorityGapChanged: (g) {
+              setState(() => _seniorityGap = g);
+              nav.setSeniorityGap(g);
+            },
           ),
 
           const Divider(height: 1, color: Color(0xFF334155)),
@@ -352,24 +367,20 @@ class _MainSplitViewState extends State<MainSplitView> {
 
     switch (_currentTab) {
       case MainViewTab.graphView:
-        return GestureDetector(
-          onDoubleTap: _resetCanvasFit,
-          child: InteractiveViewer(
-            transformationController: _transformController,
-            boundaryMargin: const EdgeInsets.all(500),
-            minScale: 0.2,
-            maxScale: 3.5,
-            child: SynapseGraphCanvas(
-              network: nav.networkData!,
-              activeFilters: nav.activeFilters,
-              selectedNode: nav.selectedNode,
-              selectedEdge: nav.selectedEdge,
-              highlightPathNodeIds: nav.highlightPathNodeIds,
-              onNodeSelected: (node) => nav.selectNode(node),
-              onEdgeSelected: (edge) => nav.selectEdge(edge),
-              onNodeDoubleTapped: (node) => nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type),
-            ),
-          ),
+        return SynapseGraphCanvas(
+          network: nav.networkData!,
+          activeFilters: nav.activeFilters,
+          selectedNode: nav.selectedNode,
+          selectedEdge: nav.selectedEdge,
+          highlightPathNodeIds: nav.highlightPathNodeIds,
+          onNodeSelected: (node) {
+            nav.selectNode(node);
+            if (node.id != nav.currentFocusId) {
+              nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type);
+            }
+          },
+          onEdgeSelected: (edge) => nav.selectEdge(edge),
+          onNodeDoubleTapped: (node) => nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type),
         );
 
       case MainViewTab.orgTreeView:
