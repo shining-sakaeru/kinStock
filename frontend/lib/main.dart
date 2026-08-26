@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/api/api_client.dart';
 import 'core/theme/app_theme.dart';
-import 'views/main_workspace_view.dart';
+import 'views/main_split_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +19,7 @@ class KinStockApp extends StatelessWidget {
       title: 'KinStock - DART 인물·기업 네트워크 그래프',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: MainWorkspaceView(apiClient: apiClient),
+      home: MainSplitView(apiClient: apiClient),
     );
   }
 }
