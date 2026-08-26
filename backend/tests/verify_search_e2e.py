@@ -24,6 +24,12 @@ class SearchE2ETestRunner:
         )
 
     def run_all_e2e_tests(self) -> Dict[str, Any]:
+        # Warm up driver connection
+        try:
+            self.search_use_case.execute("warmup", limit=1)
+        except Exception:
+            pass
+
         results: List[Dict[str, Any]] = []
         overall_passed = True
         start_all = time.perf_counter()
