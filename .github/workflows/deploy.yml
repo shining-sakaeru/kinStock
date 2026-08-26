@@ -101,6 +101,7 @@ jobs:
   deploy:
     name: Deploy to Oracle Cloud ARM64 VM
     needs: build-and-push
+    if: "${{ secrets.ORACLE_HOST != '' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

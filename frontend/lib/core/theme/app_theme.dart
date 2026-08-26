@@ -68,14 +68,7 @@ class AppleTheme {
         error: AppleColors.systemRed,
         background: AppleColors.systemBackground,
       ),
-      cardTheme: CardTheme(
-        color: AppleColors.secondarySystemBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppleColors.separator, width: 0.8),
-        ),
-        elevation: 0,
-      ),
+      cardColor: AppleColors.secondarySystemBackground,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
