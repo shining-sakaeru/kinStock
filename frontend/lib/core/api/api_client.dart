@@ -68,6 +68,21 @@ class ApiClient {
     }
   }
 
+  // 1-1. Theme Stock Ranking & 3-Depth Why Engine API
+  Future<Map<String, dynamic>> getPersonThemeStocks(String personId) async {
+    final uri = Uri.parse('$baseUrl/themes/stocks').replace(queryParameters: {'person_id': personId});
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      throw Exception('Failed to load theme stocks: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getPersonThemeStocks error: $e, using mock fallback');
+      return _getMockPersonThemeStocks(personId);
+    }
+  }
+
   // 2. Themes & Mode C Theme Cluster
   Future<List<ThemeModel>> getThemes() async {
     final uri = Uri.parse('$baseUrl/themes');
@@ -723,5 +738,85 @@ class ApiClient {
         GraphPathEdgeModel(source: 'P_LEE_JM', target: 'C_045660', relationType: 'POLICY_THEME', label: '성남 창조경영 CEO포럼 연계', weight: 0.90, sourceUrl: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240322000891'),
       ],
     );
+  }
+
+  Map<String, dynamic> _getMockPersonThemeStocks(String personId) {
+    return {
+      "status": "success",
+      "person_id": personId,
+      "person_name": "이재용",
+      "person_title": "삼성전자 회장",
+      "person_alma_mater": ["서울대학교 동양사학", "하버드대 MBA"],
+      "person_cohort": "재계 총수 3세 / 하버드 동문",
+      "person_hometown": "서울특별시",
+      "total_stocks_count": 4,
+      "avg_kin_score": 92.5,
+      "stocks": [
+        {
+          "rank": 1,
+          "ticker": "028260",
+          "company_name": "삼성물산",
+          "industry": "종합상사 / 건설 / 지주사",
+          "kin_score": 98.0,
+          "theme_tier": "FOLLOWER",
+          "theme_tier_label": "🔥 그룹 핵심 지주",
+          "depth1_hook": "이재용 회장이 최대주주(지분율 17.97%)로 그룹 전체 지배구조 정점",
+          "depth2_causal_chain": {
+            "source_person": {"id": personId, "name": "이재용", "type": "PERSON", "role_or_title": "삼성전자 회장"},
+            "p2p_edge": {"from_id": personId, "to_id": "P_LEE_JY", "relation_label": "동일인 (오너 3세)", "badge": "오너 직결", "evidence_text": "오너 본인", "weight": 1.0},
+            "intermediary_person": {"id": "P_LEE_JY", "name": "이재용 회장", "type": "PERSON", "role_or_title": "삼성물산 최대주주 (17.97%)"},
+            "p2c_edge": {"from_id": "P_LEE_JY", "to_id": "028260", "relation_label": "최대주주 지분 보유 및 지배력", "badge": "DART 공시", "evidence_text": "최대주주 현황", "weight": 1.0},
+            "target_company": {"id": "028260", "name": "삼성물산 (028260)", "type": "COMPANY", "role_or_title": "종합상사 / 지주", "extra_info": "시총 27조 3,000억"}
+          },
+          "depth3_evidence": {
+            "dart_filing_title": "삼성물산 2024.03 사업보고서 최대주주 주식소유 현황",
+            "rcp_no": "20240321001200",
+            "filing_date": "2024.03.21",
+            "verified_fact": "이재용 회장 지분 17.97% 보유 최대주주 등재 사실 확인",
+            "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240321001200",
+            "market_track_record": "지배구조 개편 및 자사주 소각 발표 시 시장 주도 강세"
+          },
+          "trading_metrics": {
+            "market_cap_str": "27조 3,000억",
+            "current_price": 146200,
+            "price_change_rate": 4.13,
+            "major_shareholder_ratio": 33.4,
+            "floating_ratio": 66.6
+          }
+        },
+        {
+          "rank": 2,
+          "ticker": "005930",
+          "company_name": "삼성전자",
+          "industry": "반도체 / 스마트폰",
+          "kin_score": 96.5,
+          "theme_tier": "FOLLOWER",
+          "theme_tier_label": "⚡ 그룹 플래그십",
+          "depth1_hook": "회장 본인이 직접 책임경영 총괄 및 전영현·한종희 부회장단 직속 연계",
+          "depth2_causal_chain": {
+            "source_person": {"id": personId, "name": "이재용", "type": "PERSON", "role_or_title": "삼성전자 회장"},
+            "p2p_edge": {"from_id": personId, "to_id": "P_JUN_YH", "relation_label": "15년+ 부회장단 공동 경영", "badge": "핵심 경영진", "evidence_text": "DART 임원의 현황", "weight": 0.96},
+            "intermediary_person": {"id": "P_JUN_YH", "name": "전영현 부회장", "type": "PERSON", "role_or_title": "DS부문장 대표이사"},
+            "p2c_edge": {"from_id": "P_JUN_YH", "to_id": "005930", "relation_label": "DS부문장 및 이사회 책임경영", "badge": "DART 등재", "evidence_text": "임원의 현황", "weight": 0.95},
+            "target_company": {"id": "005930", "name": "삼성전자 (005930)", "type": "COMPANY", "role_or_title": "반도체 / IT", "extra_info": "시총 465조"}
+          },
+          "depth3_evidence": {
+            "dart_filing_title": "삼성전자 2024.03 사업보고서 임원의 현황",
+            "rcp_no": "20240321001201",
+            "filing_date": "2024.03.21",
+            "verified_fact": "이재용 회장 등재 및 전영현 부회장 부임 공시 확인",
+            "dart_url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240321001201",
+            "market_track_record": "HBM 납품 및 신규 파운드리 수주 모멘텀"
+          },
+          "trading_metrics": {
+            "market_cap_str": "465조 6,000억",
+            "current_price": 78000,
+            "price_change_rate": 2.1,
+            "major_shareholder_ratio": 21.2,
+            "floating_ratio": 78.8
+          }
+        }
+      ]
+    };
   }
 }

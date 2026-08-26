@@ -151,7 +151,7 @@ def inject_core_seed_data():
         edge = NetworkEdge(
             source_id=p1,
             target_id=p2,
-            relation_type=RelationType.ALUMNI,
+            relation_type=RelationType.UNIVERSITY_ALUMNI,
             label=label,
             badge="DART 인맥 팩트",
             base_weight=weight,

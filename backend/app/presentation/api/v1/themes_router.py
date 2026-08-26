@@ -6,8 +6,19 @@ from app.data.mappers.domain_dto_mapper import DomainDtoMapper
 from app.domain.entities.weight_settings import WeightSettings
 from app.data.repositories.memory_store import memory_store
 from app.presentation.dependencies import theme_cluster_use_case
+from app.schemas.theme_stock_response import PersonThemeStocksResponse
+from app.services.scoring.theme_stock_ranker import theme_stock_ranker
 
 router = APIRouter()
+
+@router.get("/themes/stocks", response_model=PersonThemeStocksResponse, summary="인물 기준 Kin-Score 랭킹 및 3-Depth 인과 사슬 조회")
+def get_person_theme_stocks(
+    person_id: str = Query(..., description="조회할 인물 ID 또는 이름 (예: P_이재용_196806_M, 이재명, 한동훈)")
+):
+    """
+    Returns investor-centric Kin-Score ranking and 3-Depth Causal Chain (Why Engine) for the selected person.
+    """
+    return theme_stock_ranker.get_ranked_theme_stocks(person_id)
 
 @router.get("/themes", response_model=List[ThemeDto], summary="5대 핵심 테마 목록 조회")
 def get_themes():

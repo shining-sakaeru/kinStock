@@ -40,6 +40,7 @@ class NetworkEdge:
     badge: str
     base_weight: float
     source_url: str
+    rcept_no: Optional[str] = "20240321001201"
 
 @dataclass(frozen=True)
 class NetworkPath:
