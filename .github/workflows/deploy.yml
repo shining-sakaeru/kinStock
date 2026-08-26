@@ -101,25 +101,32 @@ jobs:
   deploy:
     name: Deploy to Oracle Cloud ARM64 VM
     needs: build-and-push
-    if: secrets.ORACLE_HOST != ''
     runs-on: ubuntu-latest
+    env:
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_USERNAME: ${{ secrets.ORACLE_USERNAME }}
+      ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
     steps:
       - name: Checkout Code
+        if: env.ORACLE_HOST != ''
         uses: actions/checkout@v4
 
       - name: Set up Flutter for Web Sync
+        if: env.ORACLE_HOST != ''
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
       - name: Compile Flutter Web
+        if: env.ORACLE_HOST != ''
         working-directory: ./frontend
         run: |
           flutter pub get
           flutter build web --release --pwa-strategy=none
 
       - name: Transfer Web Build & Config to Oracle VM
+        if: env.ORACLE_HOST != ''
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ORACLE_HOST }}
@@ -130,6 +137,7 @@ jobs:
           target: "~/kinStock"
 
       - name: Execute Remote Deployment on Oracle VM
+        if: env.ORACLE_HOST != ''
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ORACLE_HOST }}
@@ -143,3 +151,4 @@ jobs:
             sudo docker compose up -d --build --remove-orphans
             sudo docker image prune -f
             echo "✅ KinStock Nginx + FastAPI + Neo4j Deployment Complete on Oracle VM!"
+
