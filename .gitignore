@@ -36,7 +36,8 @@ frontend/.idea/
 frontend/*.iml
 
 # Data & Runtime logs
-data/
+/data/
+logs/
 *.log
 
 # Environment files
