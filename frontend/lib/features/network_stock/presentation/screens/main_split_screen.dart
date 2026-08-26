@@ -18,6 +18,8 @@ import '../widgets/key_figures_carousel.dart';
 import '../widgets/stock_selector_carousel.dart';
 import '../widgets/micro_radial_graph_view.dart';
 import '../widgets/synapse_graph_canvas.dart';
+import '../widgets/synapse_evidence_sheet.dart';
+import '../widgets/admin_batch_view.dart';
 import '../widgets/ranked_stock_table.dart';
 import '../widgets/ranked_figures_table.dart';
 import '../widgets/weight_settings_sheet.dart';
@@ -421,7 +423,16 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
         ),
         actions: [
           CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: const Icon(
+              CupertinoIcons.chart_bar_square_fill,
+              size: 20,
+              color: AppleColors.systemGreen,
+            ),
+            onPressed: () => AdminBatchView.show(context, widget.apiClient),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Icon(
               CupertinoIcons.slider_horizontal_3,
               size: 20,
@@ -430,7 +441,7 @@ class _MainSplitScreenState extends State<MainSplitScreen> {
             onPressed: _openWeightSettings,
           ),
           CupertinoButton(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 12, left: 6),
             child: const Icon(CupertinoIcons.arrow_clockwise, size: 20, color: AppleColors.label),
             onPressed: _loadInitialData,
           ),
