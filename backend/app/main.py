@@ -12,6 +12,7 @@ from app.presentation.api.v1.relations_router import router as relations_router
 from app.presentation.api.v1.weights_router import router as weights_router
 from app.presentation.api.v1.network_router import router as network_router
 from app.presentation.api.v1.admin_router import router as admin_router
+from app.presentation.api.v1.person_network_router import router as person_network_router
 from app.services.nightly_batch_scheduler import start_apscheduler
 from app.services.seed_injector import inject_core_seed_data
 
@@ -64,6 +65,7 @@ app.include_router(stocks_router, prefix="/api/v1", tags=["Stocks & Mode B Stock
 app.include_router(relations_router, prefix="/api/v1", tags=["Tier 2 Relations & Rationale"])
 app.include_router(weights_router, prefix="/api/v1", tags=["Weights & Baseline"])
 app.include_router(network_router, prefix="/api/v1", tags=["Synapse Network"])
+app.include_router(person_network_router, prefix="/api/v1", tags=["Person Network & Kin-Bond Engine"])
 app.include_router(admin_router, prefix="/api/v1", tags=["Admin & Batch Monitoring"])
 
 # 2. Mount Flutter Web SPA (All-in-One single port hosting for Mobile / Tunnels)

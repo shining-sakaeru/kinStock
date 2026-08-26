@@ -249,12 +249,26 @@ class EvidenceInspectorDrawer extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        Text(
-          node.name,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFFF8FAFC),
+        // Entity Title & Pivot Action
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => onNavigateToNode?.call(node.id),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    node.name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF8FAFC),
+                    ),
+                  ),
+                ),
+                const Icon(CupertinoIcons.scope, size: 16, color: Color(0xFF38BDF8)),
+              ],
+            ),
           ),
         ),
         if (node.subtitle != null && node.subtitle!.isNotEmpty) ...[
@@ -264,6 +278,30 @@ class EvidenceInspectorDrawer extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           ),
         ],
+        const SizedBox(height: 14),
+
+        // Primary Pivot Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8).withOpacity(0.18),
+              foregroundColor: const Color(0xFF38BDF8),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Color(0xFF38BDF8)),
+              ),
+            ),
+            icon: const Icon(CupertinoIcons.scope, size: 14),
+            label: const Text(
+              '🎯 이 엔티티 중심으로 재배치 (Pivot)',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+            ),
+            onPressed: () => onNavigateToNode?.call(node.id),
+          ),
+        ),
         const SizedBox(height: 16),
 
         // Key Metadata Table

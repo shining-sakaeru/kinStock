@@ -175,6 +175,47 @@ class _SynapseGraphCanvasState extends State<SynapseGraphCanvas> with SingleTick
   Widget build(BuildContext context) {
     return ClipRect(
       child: GestureDetector(
+        onTapUp: (details) {
+          final box = context.findRenderObject() as RenderBox?;
+          if (box == null) return;
+          final localPos = details.localPosition;
+          final size = box.size;
+          final center = Offset(size.width / 2, size.height / 2) + _panOffset;
+          // Inverse transform
+          final canvasPos = (localPos - center) / _scale;
+
+          // Check if any node was tapped (including label bounding area)
+          for (final node in widget.network.nodes) {
+            final pos = _nodePositions[node.id];
+            if (pos != null) {
+              final isCompany = node.type == 'COMPANY';
+              final radius = isCompany ? 32.0 : 26.0;
+              // Circle and label area
+              final hitRect = Rect.fromCenter(
+                center: Offset(pos.dx, pos.dy + 10),
+                width: radius * 2.6,
+                height: radius * 3.0,
+              );
+              if (hitRect.contains(canvasPos)) {
+                widget.onNodeSelected(node);
+                return;
+              }
+            }
+          }
+
+          // Check if any edge was tapped
+          for (final edge in _filteredEdges) {
+            final p1 = _nodePositions[edge.source];
+            final p2 = _nodePositions[edge.target];
+            if (p1 != null && p2 != null) {
+              final mid = (p1 + p2) / 2;
+              if ((canvasPos - mid).distance < 24.0) {
+                widget.onEdgeSelected(edge);
+                return;
+              }
+            }
+          }
+        },
         onPanUpdate: (details) {
           if (_draggedNodeId == null) {
             setState(() {

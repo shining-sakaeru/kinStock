@@ -6,6 +6,8 @@ import '../core/api/api_client.dart';
 import '../widgets/common/kinstock_app_bar.dart';
 import '../widgets/drawer/evidence_inspector_drawer.dart';
 import '../widgets/filter/synapse_filter_bar.dart';
+import '../widgets/analysis/multi_perspective_selector.dart';
+import '../widgets/cards/person_bond_radar_card.dart';
 import '../widgets/graph/depth_level_selector.dart';
 import '../widgets/graph/synapse_graph_canvas.dart';
 
@@ -27,6 +29,8 @@ class MainSplitView extends StatefulWidget {
 class _MainSplitViewState extends State<MainSplitView> {
   late NavigationController _navController;
   MainViewTab _currentTab = MainViewTab.graphView;
+  PerspectiveMode _perspective = PerspectiveMode.comprehensive;
+  int? _seniorityGap;
   final TransformationController _transformController = TransformationController();
 
   @override
@@ -148,6 +152,14 @@ class _MainSplitViewState extends State<MainSplitView> {
           SynapseFilterBar(
             selectedFilters: nav.activeFilters,
             onFilterToggled: (type) => nav.toggleFilter(type),
+          ),
+
+          // 3. Multi-Perspective Analysis Selector (Alumni, Legal, Regional, Chaerok)
+          MultiPerspectiveSelector(
+            currentPerspective: _perspective,
+            selectedSeniorityGap: _seniorityGap,
+            onPerspectiveChanged: (p) => setState(() => _perspective = p),
+            onSeniorityGapChanged: (g) => setState(() => _seniorityGap = g),
           ),
 
           const Divider(height: 1, color: Color(0xFF334155)),
