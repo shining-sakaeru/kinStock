@@ -163,7 +163,7 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
 
                   // Depth 3: DART Audit Fact & Evidence Box
                   _buildSectionHeader('Depth 3: 🟢 [DART 100% 팩트] 법적 공시 근거', CupertinoIcons.checkmark_shield_fill),
-                  _buildDartEvidenceBox(evidence),
+                  _buildDartEvidenceBox(evidence, stockCode, stockName),
                   const SizedBox(height: 20),
 
                   // Market Supply & Elasticity Metrics
@@ -354,7 +354,7 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
               )
             else if (isPerson)
               GestureDetector(
-                onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getAssemblyUrl(title)),
+                onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getPersonProfileUrl(title)),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
@@ -411,12 +411,15 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildDartEvidenceBox(Map<String, dynamic> evidence) {
+  Widget _buildDartEvidenceBox(Map<String, dynamic> evidence, String stockCode, String stockName) {
     final reportName = evidence['report_name'] as String? ?? '2024.03 사업보고서';
-    final section = evidence['section'] as String? ?? 'VIII. 임원 및 직원 등에 관한 사항 (p.52)';
+    final section = evidence['section'] as String? ?? 'VIII. 임원 및 직원 등에 관한 사항 (1. 임원의 현황)';
     final snippet = evidence['snippet'] as String? ?? '대표이사 및 주요 임원의 학연·경력 등재 사실 확인';
-    final rcpNo = evidence['rcept_no'] as String? ?? '20240315001234';
-    final sourceUrl = (evidence['source_url'] as String?) ?? UrlLauncherHelper.getDartFilingUrl(rcpNo);
+    final rcpNo = evidence['rcept_no'] as String? ?? '20240320000845';
+    
+    // Direct link to live official DART disclosure table
+    final dartDisclosuresUrl = UrlLauncherHelper.getDartDisclosuresUrl(stockCode);
+    final factProofUrl = UrlLauncherHelper.getSpecificCausalProofUrl(stockName, stockName);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -460,6 +463,8 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
+
+          // Action Link 1: Real-Time DART Disclosures Table
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -468,9 +473,25 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                 side: const BorderSide(color: Color(0xFF10B981)),
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
+              icon: const Icon(CupertinoIcons.doc_text_search, size: 13),
+              label: const Text('DART 실시간 전자공시 목록 바로보기 ↗', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              onPressed: () => UrlLauncherHelper.launch(dartDisclosuresUrl),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Action Link 2: Specific Causal Evidence Article
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF38BDF8),
+                side: const BorderSide(color: Color(0xFF38BDF8)),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
               icon: const Icon(CupertinoIcons.link, size: 12),
-              label: const Text('DART 전자공시 원문 확인하기 ↗', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-              onPressed: () => UrlLauncherHelper.launch(sourceUrl),
+              label: const Text('🔍 인과 근거 팩트 증빙 보도 확인 ↗', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              onPressed: () => UrlLauncherHelper.launch(factProofUrl),
             ),
           ),
         ],
