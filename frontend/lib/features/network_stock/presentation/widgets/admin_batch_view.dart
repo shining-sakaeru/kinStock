@@ -5,6 +5,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/batch_progress_model.dart';
 import 'apple_frosted_card.dart';
+import 'db_raw_explorer_dialog.dart';
 
 class AdminBatchView extends StatefulWidget {
   final ApiClient apiClient;
@@ -322,6 +323,27 @@ class _AdminBatchViewState extends State<AdminBatchView> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 2-1. Raw Data Inspector Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF38BDF8).withOpacity(0.18),
+                          foregroundColor: const Color(0xFF38BDF8),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: Color(0xFF38BDF8), width: 1),
+                          ),
+                        ),
+                        onPressed: () => DbRawExplorerDialog.show(context, widget.apiClient),
+                        icon: const Icon(CupertinoIcons.square_stack_3d_up_fill, size: 18),
+                        label: const Text('📦 DB 원천 데이터(Raw Data) 전수 열람 및 JSON 인스펙터', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
                     ),
                     const SizedBox(height: 16),
 

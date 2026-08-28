@@ -24,12 +24,9 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
   bool _isHoveringFocusChip = false;
 
   void _showPivotSelectionDialog(BuildContext context, NavigationController nav) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      barrierDismissible: true,
       builder: (ctx) {
         final figures = [
           {'id': 'P_LEE_JM', 'name': '이재명', 'role': '국회의원 / 민주당 대표', 'type': 'PERSON'},
@@ -45,7 +42,15 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
           {'id': '005930', 'name': '삼성전자', 'role': '코스피 005930 / 반도체·IT', 'type': 'COMPANY'},
         ];
 
-        return Container(
+        return Dialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF334155)),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 580),
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -107,10 +112,11 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
