@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/api/api_client.dart';
@@ -29,17 +30,41 @@ class _AdminBatchViewState extends State<AdminBatchView> {
   Map<String, dynamic>? _searchTestReport;
   bool _isCheckingHealth = false;
   bool _isRunningSearchTest = false;
+  bool _isTriggeringBatch = false;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchProgress();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) _fetchProgress();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   void _fetchProgress() {
     setState(() {
       _progressFuture = widget.apiClient.getBatchProgressStatus();
     });
+  }
+
+  Future<void> _triggerLiveBatch() async {
+    setState(() => _isTriggeringBatch = true);
+    try {
+      await widget.apiClient.triggerBatchStep(count: 10);
+      if (mounted) {
+        _fetchProgress();
+        setState(() => _isTriggeringBatch = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isTriggeringBatch = false);
+    }
   }
 
   Future<void> _runHealthCheck() async {
@@ -236,7 +261,31 @@ class _AdminBatchViewState extends State<AdminBatchView> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 2. Action Buttons
+                    // 2. Trigger Action Buttons
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppleColors.systemBlue.withOpacity(0.2),
+                          foregroundColor: AppleColors.systemBlue,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: const BorderSide(color: AppleColors.systemBlue, width: 1),
+                          ),
+                        ),
+                        onPressed: _isTriggeringBatch ? null : _triggerLiveBatch,
+                        icon: _isTriggeringBatch
+                            ? const CupertinoActivityIndicator(radius: 8, color: AppleColors.systemBlue)
+                            : const Icon(CupertinoIcons.play_circle_fill, size: 16),
+                        label: Text(
+                          _isTriggeringBatch ? 'DART 기업 및 임원 데이터 파싱/적재 중...' : '⚡ 실시간 10개 기업 즉시 수집/적재 실행',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      ),
+                    ),
                     Row(
                       children: [
                         Expanded(

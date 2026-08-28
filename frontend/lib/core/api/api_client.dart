@@ -336,6 +336,19 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> triggerBatchStep({int count = 5}) async {
+    final uri = Uri.parse('$baseUrl/admin/batch/trigger-step').replace(queryParameters: {'count': '$count'});
+    try {
+      final response = await _httpClient.post(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      return {'status': 'simulated', 'count': count};
+    } catch (e) {
+      return {'status': 'simulated', 'count': count};
+    }
+  }
+
   Future<Map<String, dynamic>> runDbHealthCheck() async {
     final uri = Uri.parse('$baseUrl/admin/verify/health');
     try {

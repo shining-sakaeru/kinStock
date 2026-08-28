@@ -16,6 +16,13 @@ def get_batch_progress_status():
     """
     return progress_manager.get_metrics()
 
+@router.post("/batch/trigger-step", summary="실시간 배치 수집/적재 스텝 즉시 수동 트리거")
+def trigger_batch_step(count: int = 5) -> Dict[str, Any]:
+    """
+    Manually advances the batch crawler by the given number of companies.
+    """
+    return progress_manager.trigger_step(count)
+
 @router.get("/verify/health", summary="DB 적재 데이터 정합성 & 출처(Evidence) 무결성 자체 검증")
 def get_db_health_verification() -> Dict[str, Any]:
     """

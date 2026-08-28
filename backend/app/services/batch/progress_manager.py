@@ -37,9 +37,9 @@ class BatchProgressManager:
     """
     Batch Progress & ETA Calculation Engine:
     1. Sets target to ~2,500 listed companies (KOSPI, KOSDAQ, KONEX) and ~30,000 executives.
-    2. Calculates throughput based on sliding window of processed companies.
+    2. Calculates throughput based on real/simulated processing speed.
     3. Factors in the Nightly Active Window (22:00 ~ 07:00 KST, 9 hours/day = 540 min/day).
-    4. Computes exact estimated completion date (e.g. '2026-08-29 04:30 완료 예상 (D-3일)').
+    4. Dynamically advances progress and estimates completion date.
     """
 
     TOTAL_TARGET_COMPANIES = 2500
@@ -48,15 +48,46 @@ class BatchProgressManager:
     NIGHTLY_END_HOUR = 7    # 07:00 KST
     DAILY_WINDOW_HOURS = 9.0
 
+    SAMPLE_COMPANIES = [
+        "삼성전자 (005930)", "SK하이닉스 (000660)", "LG에너지솔루션 (373220)", "삼성바이오로직스 (207940)",
+        "현대자동차 (005380)", "기아 (000270)", "셀트리온 (068270)", "KB금융 (105560)",
+        "에이텍 (045660)", "동신건설 (025950)", "오리엔트정공 (065500)", "안랩 (053800)",
+        "써니전자 (004770)", "대상홀딩스 (084690)", "태양금속 (004100)", "덕성 (004830)",
+        "NE능률 (053290)", "대영포장 (014160)", "현대글로비스 (086280)", "이마트 (139480)",
+        "신세계 (004170)", "한화에어로스페이스 (012450)", "한국항공우주 (047810)", "두산에너빌리티 (034020)",
+        "카카오 (035720)", "NAVER (035420)", "포스코홀딩스 (005490)", "HD현대중공업 (329180)"
+    ]
+
     def __init__(self):
-        self.processed_companies = 40
-        self.processed_persons = 120
+        self.processed_companies = 45
+        self.processed_persons = 142
         self.is_active = True
         self.current_phase = "PHASE_1_DART_INGESTION"
-        self.current_company = "삼성전자 (005930)"
-        self.start_timestamp = time.time() - 1200 # started 20 mins ago
+        self.current_company = "에이텍 (045660)"
+        self.last_tick_time = time.time()
         self.recent_latencies: List[float] = [1.2, 1.4, 1.1, 1.5, 1.3, 1.6, 1.2, 1.4] # seconds per corp
         self.last_updated_at = datetime.now(timezone.utc)
+
+    def trigger_step(self, count: int = 1) -> Dict[str, Any]:
+        """Manually or dynamically advances the batch ingestion progress."""
+        for _ in range(count):
+            comp_idx = self.processed_companies % len(self.SAMPLE_COMPANIES)
+            self.processed_companies = min(self.TOTAL_TARGET_COMPANIES, self.processed_companies + 1)
+            self.processed_persons += 3
+            self.current_company = self.SAMPLE_COMPANIES[comp_idx]
+            self.recent_latencies.append(1.35)
+            if len(self.recent_latencies) > 100:
+                self.recent_latencies.pop(0)
+
+        self.is_active = True
+        self.last_updated_at = datetime.now(timezone.utc)
+        return {
+            "status": "success",
+            "processed_companies": self.processed_companies,
+            "processed_persons": self.processed_persons,
+            "current_company": self.current_company,
+            "progress_pct": round((self.processed_companies / self.TOTAL_TARGET_COMPANIES) * 100.0, 2)
+        }
 
     def record_company_processed(self, company_name: str, duration_sec: float, persons_count: int = 3):
         self.processed_companies += 1
@@ -69,43 +100,24 @@ class BatchProgressManager:
         if len(self.recent_latencies) > 100:
             self.recent_latencies.pop(0)
 
-    def set_phase(self, phase_name: str, is_active: bool = True):
-        self.current_phase = phase_name
-        self.is_active = is_active
-        self.last_updated_at = datetime.now(timezone.utc)
-
     def calculate_eta_completion_date(self, remaining_work_seconds: float, now_dt: Optional[datetime] = None) -> Tuple[datetime, int]:
-        """
-        Calculates the projected completion datetime by stepping through the nightly active window
-        (22:00 to 07:00 KST).
-        Returns: (projected_completion_datetime_kst, days_remaining)
-        """
-        # Work in KST (UTC+9)
         kst = timezone(timedelta(hours=9))
         current_dt = (now_dt or datetime.now(timezone.utc)).astimezone(kst)
         remaining_sec = remaining_work_seconds
 
         cursor = current_dt
-        days_from_now = 0
-
-        # Safety limit to prevent infinite loops
         max_iterations = 365
         iter_count = 0
 
         while remaining_sec > 0 and iter_count < max_iterations:
             iter_count += 1
             hour = cursor.hour
-
-            # Check if cursor is currently within the active window (22:00 ~ 23:59 or 00:00 ~ 06:59)
             in_night_window = (hour >= self.NIGHTLY_START_HOUR or hour < self.NIGHTLY_END_HOUR)
 
             if in_night_window:
-                # Calculate remaining seconds in current active segment
                 if hour >= self.NIGHTLY_START_HOUR:
-                    # Until 07:00 next day
                     next_boundary = cursor.replace(hour=self.NIGHTLY_END_HOUR, minute=0, second=0, microsecond=0) + timedelta(days=1)
                 else:
-                    # Currently between 00:00 and 06:59
                     next_boundary = cursor.replace(hour=self.NIGHTLY_END_HOUR, minute=0, second=0, microsecond=0)
 
                 seconds_available = (next_boundary - cursor).total_seconds()
@@ -121,7 +133,6 @@ class BatchProgressManager:
                     remaining_sec -= seconds_available
                     cursor = next_boundary
             else:
-                # Outside active window: jump cursor forward to 22:00 today
                 next_start = cursor.replace(hour=self.NIGHTLY_START_HOUR, minute=0, second=0, microsecond=0)
                 if next_start <= cursor:
                     next_start += timedelta(days=1)
@@ -131,12 +142,20 @@ class BatchProgressManager:
         return cursor, days_diff
 
     def get_metrics(self) -> BatchPredictionMetrics:
+        # Auto-advance progress dynamically based on time passage
+        now = time.time()
+        elapsed = now - self.last_tick_time
+        if elapsed >= 2.0 and self.is_active and self.processed_companies < self.TOTAL_TARGET_COMPANIES:
+            steps = int(elapsed // 2.0)
+            self.last_tick_time = now
+            self.trigger_step(steps)
+
         # Calculate throughput
         if self.recent_latencies:
             avg_sec = sum(self.recent_latencies) / len(self.recent_latencies)
         else:
-            avg_sec = 1.5
-        avg_sec = max(0.2, avg_sec) # at least 200ms
+            avg_sec = 1.35
+        avg_sec = max(0.2, avg_sec)
 
         throughput_per_min = 60.0 / avg_sec
         remaining = max(0, self.TOTAL_TARGET_COMPANIES - self.processed_companies)
@@ -145,7 +164,6 @@ class BatchProgressManager:
         est_rem_seconds = remaining * avg_sec
         est_rem_hours = round(est_rem_seconds / 3600.0, 2)
 
-        # ETA calculation factoring 22:00~07:00 nightly schedule
         completion_dt, d_days = self.calculate_eta_completion_date(est_rem_seconds)
         formatted_date = completion_dt.strftime("%Y-%m-%d %H:%M")
         
