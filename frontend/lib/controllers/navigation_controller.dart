@@ -8,9 +8,9 @@ class NavigationController extends ChangeNotifier {
   final ApiClient apiClient;
 
   // Active Focus Entity (Node Pivot)
-  String _currentFocusId = '005930'; // Default: 삼성전자
-  String _currentFocusName = '삼성전자';
-  String _currentFocusType = 'COMPANY';
+  String _currentFocusId = 'P_LEE_JM'; // Default: 이재명
+  String _currentFocusName = '이재명';
+  String _currentFocusType = 'PERSON';
 
   // N-Depth Control (1-Depth, 2-Depth, 3-Depth)
   int _depthLevel = 1;
