@@ -6,8 +6,9 @@ import '../../features/network_stock/presentation/widgets/admin_batch_view.dart'
 
 class KinStockAppBar extends StatefulWidget implements PreferredSizeWidget {
   final NavigationController navController;
+  final VoidCallback? onOpenDrawer;
 
-  const KinStockAppBar({super.key, required this.navController});
+  const KinStockAppBar({super.key, required this.navController, this.onOpenDrawer});
 
   @override
   State<KinStockAppBar> createState() => _KinStockAppBarState();
@@ -24,10 +25,11 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
   @override
   Widget build(BuildContext context) {
     final nav = widget.navController;
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return Container(
       height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         color: Color(0xFF1E293B), // Slate Surface
         border: Border(
@@ -36,6 +38,15 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
       ),
       child: Row(
         children: [
+          // 0. Mobile Hamburger Menu Icon
+          if (isMobile && widget.onOpenDrawer != null) ...[
+            IconButton(
+              icon: const Icon(CupertinoIcons.bars, color: Color(0xFF38BDF8), size: 22),
+              onPressed: widget.onOpenDrawer,
+            ),
+            const SizedBox(width: 4),
+          ],
+
           // 1. Logo with Hover Scale & Home Reset Feedback
           MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -53,7 +64,7 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF38BDF8).withOpacity(0.18),
                         borderRadius: BorderRadius.circular(8),
@@ -69,31 +80,32 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
                       child: const Icon(
                         CupertinoIcons.circle_grid_hex_fill,
                         color: Color(0xFF38BDF8),
-                        size: 20,
+                        size: 18,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    const Column(
+                    const SizedBox(width: 8),
+                    Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'KinStock',
                           style: TextStyle(
                             color: Color(0xFFF8FAFC),
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.6,
                           ),
                         ),
-                        Text(
-                          'DART Legal Graph Explorer',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                        if (!isMobile)
+                          const Text(
+                            'DART Legal Graph Explorer',
+                            style: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -101,7 +113,7 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 12),
 
           // 2. Global Universal Search Bar (Korean IME Debounce + Autocomplete)
           Expanded(
@@ -117,15 +129,15 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
                   ),
                   child: TextField(
                     controller: _searchCtrl,
-                    style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13),
+                    style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12.5),
                     cursorColor: const Color(0xFF38BDF8),
                     decoration: InputDecoration(
-                      hintText: '기업명, 종목코드, 인물명 검색 (예: 삼성전자, 이재용, 005930)...',
-                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
-                      prefixIcon: const Icon(CupertinoIcons.search, size: 16, color: Color(0xFF64748B)),
+                      hintText: isMobile ? '검색 (예: 이재명, 삼성전자)...' : '기업명, 종목코드, 인물명 검색 (예: 삼성전자, 이재명, 005930)...',
+                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 11.5),
+                      prefixIcon: const Icon(CupertinoIcons.search, size: 15, color: Color(0xFF64748B)),
                       suffixIcon: _searchCtrl.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 14, color: Color(0xFF64748B)),
+                              icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 13, color: Color(0xFF64748B)),
                               onPressed: () {
                                 _searchCtrl.clear();
                                 setState(() => _searchResults = []);
@@ -193,49 +205,54 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
 
           // 3. Current Pivot Entity Indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF334155)),
+          if (!isMobile) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(CupertinoIcons.scope, size: 12, color: Color(0xFF38BDF8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '중심: ${nav.currentFocusName}',
+                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                const Icon(CupertinoIcons.scope, size: 13, color: Color(0xFF38BDF8)),
-                const SizedBox(width: 6),
-                Text(
-                  '중심: ${nav.currentFocusName}',
-                  style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 8),
+          ],
 
           // 4. Batch & Verification Trigger Button
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               color: const Color(0xFF10B981).withOpacity(0.18),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               onPressed: () => AdminBatchView.show(context, nav.apiClient),
-              child: const Row(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(CupertinoIcons.chart_bar_square_fill, size: 14, color: Color(0xFF10B981)),
-                  SizedBox(width: 6),
-                  Text(
-                    '배치/검증 센터',
-                    style: TextStyle(
-                      color: Color(0xFF10B981),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                  const Icon(CupertinoIcons.chart_bar_square_fill, size: 13, color: Color(0xFF10B981)),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 4),
+                    const Text(
+                      '배치/검증',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

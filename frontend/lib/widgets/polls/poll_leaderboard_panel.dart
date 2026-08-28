@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../core/models/event_poll_models.dart';
+import '../../core/utils/url_launcher_helper.dart';
 
 class PollLeaderboardPanel extends StatelessWidget {
   final PollLeaderboardModel? pollData;
@@ -39,7 +40,7 @@ class PollLeaderboardPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Poll Agency & Date Header
+        // Poll Agency & Date Header with Direct Official URL
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           color: const Color(0xFF0F172A),
@@ -47,9 +48,18 @@ class PollLeaderboardPanel extends StatelessWidget {
             children: [
               const Icon(CupertinoIcons.chart_pie_fill, size: 13, color: Color(0xFF38BDF8)),
               const SizedBox(width: 6),
-              Text(
-                '${latest.agency} (${latest.surveyedAt})',
-                style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11.5, fontWeight: FontWeight.w700),
+              GestureDetector(
+                onTap: () => UrlLauncherHelper.launch(latest.sourceUrl),
+                child: Row(
+                  children: [
+                    Text(
+                      '${latest.agency} (${latest.surveyedAt})',
+                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(CupertinoIcons.link, size: 10, color: Color(0xFF38BDF8)),
+                  ],
+                ),
               ),
               const Spacer(),
               Text(
@@ -135,36 +145,43 @@ class PollLeaderboardPanel extends StatelessWidget {
                         cand.roleTitle,
                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                       ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            '${cand.approvalRate.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              color: Color(0xFF38BDF8),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Icon(
-                                isPositiveDelta ? CupertinoIcons.arrow_up : CupertinoIcons.arrow_down,
-                                size: 9,
-                                color: isPositiveDelta ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
-                              ),
                               Text(
-                                '${isPositiveDelta ? '+' : ''}${cand.deltaRate.toStringAsFixed(1)}%p',
-                                style: TextStyle(
-                                  color: isPositiveDelta ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                                '${cand.approvalRate.toStringAsFixed(1)}%',
+                                style: const TextStyle(
+                                  color: Color(0xFF38BDF8),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
                                 ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isPositiveDelta ? CupertinoIcons.arrow_up : CupertinoIcons.arrow_down,
+                                    size: 9,
+                                    color: isPositiveDelta ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+                                  ),
+                                  Text(
+                                    '${isPositiveDelta ? '+' : ''}${cand.deltaRate.toStringAsFixed(1)}%p',
+                                    style: TextStyle(
+                                      color: isPositiveDelta ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
+                          const SizedBox(width: 6),
+                          const Icon(CupertinoIcons.chevron_right, size: 12, color: Color(0xFF64748B)),
                         ],
                       ),
                       onTap: () => onSelectCandidate(cand.personId, cand.personName),

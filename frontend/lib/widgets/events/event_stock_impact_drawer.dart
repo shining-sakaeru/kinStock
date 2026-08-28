@@ -1,8 +1,7 @@
-import 'dart:html' as html;
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/models/event_poll_models.dart';
+import '../../core/utils/url_launcher_helper.dart';
 
 class EventStockImpactDrawer extends StatelessWidget {
   final EventStockImpactModel impactData;
@@ -15,14 +14,6 @@ class EventStockImpactDrawer extends StatelessWidget {
     required this.onClose,
     required this.onPivotToStock,
   });
-
-  void _launchUrl(String? url) {
-    if (url != null && url.isNotEmpty) {
-      if (kIsWeb) {
-        html.window.open(url, '_blank');
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +122,7 @@ class EventStockImpactDrawer extends StatelessWidget {
                             ),
                             icon: const Icon(CupertinoIcons.link, size: 12),
                             label: const Text('공식 이벤트 원문 확인하기 ↗', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                            onPressed: () => _launchUrl(ev.sourceUrl),
+                            onPressed: () => UrlLauncherHelper.launch(ev.sourceUrl),
                           ),
                         ),
                       ],
@@ -193,15 +184,16 @@ class EventStockImpactDrawer extends StatelessWidget {
                                 style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5, fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1E293B),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  stock.roleTierLabel,
-                                  style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w700),
+                              GestureDetector(
+                                onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getStockUrl(stock.ticker)),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E293B),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF03C75A).withOpacity(0.5)),
+                                  ),
+                                  child: const Text('네이버증권 ↗', style: TextStyle(color: Color(0xFF03C75A), fontSize: 9.5, fontWeight: FontWeight.w700)),
                                 ),
                               ),
                               const Spacer(),

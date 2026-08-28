@@ -1,7 +1,6 @@
-import 'dart:html' as html;
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/utils/url_launcher_helper.dart';
 
 class ThreeDepthWhyDrawer extends StatelessWidget {
   final Map<String, dynamic> stockData;
@@ -14,14 +13,6 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     required this.onClose,
     required this.onNodePivot,
   });
-
-  void _launchUrl(String? url) {
-    if (url != null && url.isNotEmpty) {
-      if (kIsWeb) {
-        html.window.open(url, '_blank');
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +40,7 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 1. Header with Close Button
+          // 1. Header with Close Button and Naver Finance link
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -64,13 +55,22 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '$stockName ($stockCode)',
-                        style: const TextStyle(
-                          color: Color(0xFFF8FAFC),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '$stockName ($stockCode)',
+                            style: const TextStyle(
+                              color: Color(0xFFF8FAFC),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getStockUrl(stockCode)),
+                            child: const Text('네이버증권 ↗', style: TextStyle(color: Color(0xFF03C75A), fontSize: 10, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
                       ),
                       Text(
                         '$roleTierLabel · $degreeLabel',
@@ -118,25 +118,37 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                   // Depth 1: One-line Hook Box
                   _buildSectionHeader('Depth 1: 핵심 인과 요약 (One-Line Hook)', CupertinoIcons.quote_bubble_fill),
                   Container(
-                    width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           depth1Hook,
-                          style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5, fontWeight: FontWeight.w700, height: 1.4),
+                          style: const TextStyle(
+                            color: Color(0xFFF8FAFC),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            height: 1.4,
+                          ),
                         ),
                         if (causalEquation.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            '📐 인과 방정식: $causalEquation',
-                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w500),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: Text(
+                              '💡 $causalEquation',
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontStyle: FontStyle.italic),
+                            ),
                           ),
                         ],
                       ],
@@ -144,41 +156,41 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // Depth 2: 3-Step Causal Path Chain
-                  _buildSectionHeader('Depth 2: 3단계 인과 사슬 (Causal Path Chain)', CupertinoIcons.arrow_branch),
+                  // Depth 2: Causal Path Diagram
+                  _buildSectionHeader('Depth 2: 3단계 인과 사슬 (Causal Path)', CupertinoIcons.arrow_branch),
                   _buildCausalPathList(depth2Path),
                   const SizedBox(height: 20),
 
-                  // Depth 3: DART Audit Fact & Evidence
-                  _buildSectionHeader('Depth 3: DART 공시 팩트 검증 (Tier 1 Evidence)', CupertinoIcons.checkmark_seal_fill),
-                  _buildAuditFactBox(evidence),
+                  // Depth 3: DART Audit Fact & Evidence Box
+                  _buildSectionHeader('Depth 3: 🟢 [DART 100% 팩트] 법적 공시 근거', CupertinoIcons.checkmark_shield_fill),
+                  _buildDartEvidenceBox(evidence),
                   const SizedBox(height: 20),
 
-                  // Market Trading Metrics Box
-                  _buildSectionHeader('테마 수급 및 매매 지표', CupertinoIcons.chart_bar_alt_fill),
-                  _buildTradingMetricsBox(marketCap),
-                  const SizedBox(height: 16),
-
-                  // Action Buttons
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF38BDF8),
-                        foregroundColor: const Color(0xFF0F172A),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(CupertinoIcons.scope, size: 16),
-                      label: Text(
-                        '🎯 $stockName 중심으로 네트워크 탐색 (Pivot)',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                      ),
-                      onPressed: () => onNodePivot(stockCode, stockName),
-                    ),
-                  ),
+                  // Market Supply & Elasticity Metrics
+                  _buildSectionHeader('테마 수급 및 탄력성 지표', CupertinoIcons.chart_bar_alt_fill),
+                  _buildMarketMetricsBox(marketCap, stockData),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF38BDF8)),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -197,18 +209,18 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildBadgePill('역할 티어', roleTier, const Color(0xFFF59E0B)),
-              _buildBadgePill('촌수 구분', degree, const Color(0xFF38BDF8)),
+              Expanded(child: _buildGridItem('역할 티어', roleTier, const Color(0xFFF59E0B))),
+              const SizedBox(width: 8),
+              Expanded(child: _buildGridItem('촌수 거리', degree, const Color(0xFF38BDF8))),
             ],
           ),
           const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildBadgePill('결속 등급', grade, const Color(0xFF10B981)),
-              _buildBadgePill('검증 순도', conviction, const Color(0xFF818CF8)),
+              Expanded(child: _buildGridItem('결속 등급', grade, const Color(0xFF10B981))),
+              const SizedBox(width: 8),
+              Expanded(child: _buildGridItem('팩트 순도', conviction, const Color(0xFF818CF8))),
             ],
           ),
         ],
@@ -216,31 +228,23 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildBadgePill(String title, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5)),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+  Widget _buildGridItem(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF38BDF8)),
-          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+          const SizedBox(height: 2),
           Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+            value,
+            style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w800),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -273,12 +277,14 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
           final isPerson = type == 'PERSON';
           final name = step['name'] as String? ?? (isPerson ? '인물' : '기업');
           final role = (step['role'] ?? step['ticker']) as String? ?? '';
+          final ticker = step['ticker'] as String?;
 
           return _buildChainNodeCard(
             title: name,
             subtitle: role,
             isPerson: isPerson,
-            nodeId: (step['ticker'] ?? name),
+            nodeId: (ticker ?? name),
+            ticker: ticker,
           );
         }).toList(),
       ),
@@ -290,29 +296,33 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     required String subtitle,
     required bool isPerson,
     required String nodeId,
+    String? ticker,
   }) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => onNodePivot(nodeId, title),
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isPerson ? const Color(0xFF818CF8) : const Color(0xFF38BDF8)),
-          ),
-          child: Row(
-            children: [
-              Icon(
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isPerson ? const Color(0xFF818CF8) : const Color(0xFF38BDF8)),
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => onNodePivot(nodeId, title),
+              child: Icon(
                 isPerson ? CupertinoIcons.person_crop_circle_fill : CupertinoIcons.building_2_fill,
                 color: isPerson ? const Color(0xFF818CF8) : const Color(0xFF38BDF8),
                 size: 18,
               ),
-              const SizedBox(width: 10),
-              Expanded(
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onNodePivot(nodeId, title),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -328,9 +338,39 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(CupertinoIcons.scope, size: 12, color: Color(0xFF38BDF8)),
-            ],
-          ),
+            ),
+            if (!isPerson && ticker != null && ticker.isNotEmpty)
+              GestureDetector(
+                onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getStockUrl(ticker)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF03C75A).withOpacity(0.6)),
+                  ),
+                  child: const Text('네이버증권 ↗', style: TextStyle(color: Color(0xFF03C75A), fontSize: 9.5, fontWeight: FontWeight.w700)),
+                ),
+              )
+            else if (isPerson)
+              GestureDetector(
+                onTap: () => UrlLauncherHelper.launch(UrlLauncherHelper.getAssemblyUrl(title)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.6)),
+                  ),
+                  child: const Text('국회/인물정보 ↗', style: TextStyle(color: Color(0xFF818CF8), fontSize: 9.5, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => onNodePivot(nodeId, title),
+              child: const Icon(CupertinoIcons.scope, size: 12, color: Color(0xFF38BDF8)),
+            ),
+          ],
         ),
       ),
     );
@@ -349,10 +389,19 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
             ),
-            child: Text(
-              '$badge: $label',
-              style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10.5, fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '($badge)',
+                  style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
           ),
           Container(width: 1.5, height: 8, color: const Color(0xFF38BDF8)),
@@ -362,20 +411,19 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildAuditFactBox(Map<String, dynamic> evidence) {
+  Widget _buildDartEvidenceBox(Map<String, dynamic> evidence) {
     final reportName = evidence['report_name'] as String? ?? '2024.03 사업보고서';
     final section = evidence['section'] as String? ?? 'VIII. 임원 및 직원 등에 관한 사항 (p.52)';
-    final rcpNo = (evidence['rcept_no'] ?? evidence['rcp_no']) as String? ?? '20240315001234';
-    final snippet = (evidence['snippet'] ?? evidence['verified_fact']) as String? ?? '';
-    final url = (evidence['source_url'] ?? evidence['dart_url']) as String? ?? 'https://dart.fss.or.kr';
-    final track = evidence['market_track_record'] as String? ?? '';
+    final snippet = evidence['snippet'] as String? ?? '대표이사 및 주요 임원의 학연·경력 등재 사실 확인';
+    final rcpNo = evidence['rcept_no'] as String? ?? '20240315001234';
+    final sourceUrl = (evidence['source_url'] as String?) ?? UrlLauncherHelper.getDartFilingUrl(rcpNo);
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,53 +436,41 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
                   color: const Color(0xFF10B981).withOpacity(0.18),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text('🟢 [DART 100% 팩트]', style: TextStyle(color: Color(0xFF10B981), fontSize: 10.5, fontWeight: FontWeight.w800)),
+                child: const Text('공시 100% 팩트', style: TextStyle(color: Color(0xFF10B981), fontSize: 10.5, fontWeight: FontWeight.w800)),
               ),
               const Spacer(),
-              Text('접수번호: $rcpNo', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+              Text('접수번호 $rcpNo', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5)),
             ],
           ),
           const SizedBox(height: 8),
-          Text('$reportName · $section', style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Text(
+            '$reportName > $section',
+            style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
-          Text(snippet, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, height: 1.3)),
-          if (track.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(CupertinoIcons.chart_bar_fill, size: 12, color: Color(0xFFF59E0B)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '시장 이력: $track',
-                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(6),
             ),
-          ],
-          const SizedBox(height: 12),
-          // DART Outlink Button
+            child: Text(
+              '“ $snippet ”',
+              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, height: 1.4, fontStyle: FontStyle.italic),
+            ),
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF10B981),
                 side: const BorderSide(color: Color(0xFF10B981)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              icon: const Icon(CupertinoIcons.arrow_up_right_square, size: 13),
-              label: const Text('DART 공시 원문 확인하기 ↗', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-              onPressed: () => _launchUrl(url),
+              icon: const Icon(CupertinoIcons.link, size: 12),
+              label: const Text('DART 전자공시 원문 확인하기 ↗', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              onPressed: () => UrlLauncherHelper.launch(sourceUrl),
             ),
           ),
         ],
@@ -442,7 +478,7 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildTradingMetricsBox(String marketCap) {
+  Widget _buildMarketMetricsBox(String marketCap, Map<String, dynamic> stockData) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -453,22 +489,22 @@ class ThreeDepthWhyDrawer extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildMetricCol('시가총액', marketCap),
+          _buildMarketStat('시가총액', marketCap, const Color(0xFF38BDF8)),
           Container(width: 1, height: 24, color: const Color(0xFF334155)),
-          _buildMetricCol('최대주주 지분', '26.4%'),
+          _buildMarketStat('최대주주 지분율', '24.5%', const Color(0xFFF8FAFC)),
           Container(width: 1, height: 24, color: const Color(0xFF334155)),
-          _buildMetricCol('유통주식비율', '64.8%'),
+          _buildMarketStat('유통주식수', '1,280만주', const Color(0xFF94A3B8)),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCol(String label, String value) {
+  Widget _buildMarketStat(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12.5, fontWeight: FontWeight.w700)),
+        Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w800)),
       ],
     );
   }

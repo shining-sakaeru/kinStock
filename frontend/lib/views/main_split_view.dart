@@ -11,7 +11,6 @@ import '../widgets/events/event_stock_impact_drawer.dart';
 import '../widgets/events/event_timeline_slider.dart';
 import '../widgets/filter/synapse_filter_bar.dart';
 import '../widgets/analysis/multi_perspective_selector.dart';
-import '../widgets/cards/person_bond_radar_card.dart';
 import '../widgets/cards/theme_stock_rank_card.dart';
 import '../widgets/graph/depth_level_selector.dart';
 import '../widgets/graph/synapse_graph_canvas.dart';
@@ -19,15 +18,16 @@ import '../widgets/polls/poll_leaderboard_panel.dart';
 
 enum MainViewTab {
   themeStocks, // 🏆 테마주 랭킹 (Why Engine)
+  pollView,    // 📊 여론조사 랭킹 (Mobile direct tab)
   graphView,   // 🕸️ 관계도 맵 (Graph)
   orgTreeView, // 👥 조직도 목록 (Org)
   pathFinder,  // 🔍 경로 탐색기 (Path)
 }
 
 enum LeftPanelTab {
-  themeRankings, // 🏆 추천 인물/기업
+  themeRankings, // 👑 중심 인물
   pollLeaderboard, // 📊 여론조사 랭킹
-  filters,       // ⚙️ 필터 & 관점
+  filters,       // ⚙️ 분석 관점
 }
 
 class MainSplitView extends StatefulWidget {
@@ -40,6 +40,7 @@ class MainSplitView extends StatefulWidget {
 }
 
 class _MainSplitViewState extends State<MainSplitView> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late NavigationController _navController;
   MainViewTab _currentTab = MainViewTab.themeStocks;
   LeftPanelTab _leftPanelTab = LeftPanelTab.themeRankings;
@@ -130,7 +131,7 @@ class _MainSplitViewState extends State<MainSplitView> {
     }
   }
 
-  Future<void> _onSelectEvent(PoliticalEventModel event) async {
+  Future<void> _onSelectEvent(PoliticalEventModel event, {required bool isMobile}) async {
     setState(() {
       _selectedEventId = event.eventId;
       _selectedStockWhyData = null;
@@ -141,10 +142,70 @@ class _MainSplitViewState extends State<MainSplitView> {
         setState(() {
           _selectedEventImpact = impact;
         });
+        if (isMobile) {
+          _showMobileDrawer(
+            context,
+            EventStockImpactDrawer(
+              impactData: impact,
+              onClose: () => Navigator.of(context).pop(),
+              onPivotToStock: (t, n) {
+                Navigator.of(context).pop();
+                _navController.pivotToNode(t, nodeName: n, nodeType: 'COMPANY');
+              },
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error loading event stock impact: $e');
     }
+  }
+
+  void _onStockCardTapped(Map<String, dynamic> stock, {required bool isMobile}) {
+    setState(() {
+      _selectedEventImpact = null;
+      _selectedStockWhyData = stock;
+    });
+    if (isMobile) {
+      _showMobileDrawer(
+        context,
+        ThreeDepthWhyDrawer(
+          stockData: stock,
+          onClose: () => Navigator.of(context).pop(),
+          onNodePivot: (id, name) {
+            Navigator.of(context).pop();
+            _navController.pivotToNode(id, nodeName: name);
+          },
+        ),
+      );
+    }
+  }
+
+  void _showMobileDrawer(BuildContext context, Widget drawerWidget) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E293B),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: drawerWidget,
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -170,125 +231,191 @@ class _MainSplitViewState extends State<MainSplitView> {
           },
           scrollbars: true,
         ),
-        child: Scaffold(
-          backgroundColor: const Color(0xFF0F172A), // Slate 900
-          appBar: KinStockAppBar(navController: nav),
-          body: Row(
-            children: [
-              // 1. Left Sidebar (Filters, View Modes, Polls, Node Hubs)
-              _buildLeftSidebar(nav),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 900;
 
-              // 2. Center Stage (Ranked List or Interactive Canvas with Event Timeline Slider)
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          _buildCenterContent(nav),
-
-                          // Top Floating Depth Level Selector
-                          if (_currentTab == MainViewTab.graphView && nav.networkData != null)
-                            Positioned(
-                              top: 16,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: DepthLevelSelector(
-                                  currentDepth: nav.depthLevel,
-                                  totalNodes: nav.networkData!.nodes.length,
-                                  onDepthChanged: (newDepth) => nav.setDepthLevel(newDepth),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    // Bottom Event Timeline Slider
-                    EventTimelineSlider(
-                      events: _eventTimeline,
-                      isLoading: _isLoadingEvents,
-                      selectedEventId: _selectedEventId,
-                      onSelectEvent: _onSelectEvent,
-                    ),
-                  ],
-                ),
+            return Scaffold(
+              key: _scaffoldKey,
+              backgroundColor: const Color(0xFF0F172A), // Slate 900
+              appBar: KinStockAppBar(
+                navController: nav,
+                onOpenDrawer: isMobile ? () => _scaffoldKey.currentState?.openDrawer() : null,
               ),
+              drawer: isMobile
+                  ? Drawer(
+                      backgroundColor: const Color(0xFF1E293B),
+                      child: SafeArea(child: _buildLeftSidebar(nav, isMobile: true)),
+                    )
+                  : null,
+              bottomNavigationBar: isMobile ? _buildMobileBottomNav() : null,
+              body: Row(
+                children: [
+                  // 1. Desktop Left Sidebar
+                  if (!isMobile) _buildLeftSidebar(nav, isMobile: false),
 
-              // 3. Right Inspector Drawer (Event Impact OR 3-Depth Why OR Evidence Inspector)
-              if (_selectedEventImpact != null)
-                EventStockImpactDrawer(
-                  impactData: _selectedEventImpact!,
-                  onClose: () => setState(() {
-                    _selectedEventImpact = null;
-                    _selectedEventId = null;
-                  }),
-                  onPivotToStock: (t, n) {
-                    setState(() {
-                      _selectedEventImpact = null;
-                      _selectedEventId = null;
-                    });
-                    nav.pivotToNode(t, nodeName: n, nodeType: 'COMPANY');
-                  },
-                )
-              else if (_selectedStockWhyData != null)
-                ThreeDepthWhyDrawer(
-                  stockData: _selectedStockWhyData!,
-                  onClose: () => setState(() => _selectedStockWhyData = null),
-                  onNodePivot: (id, name) {
-                    setState(() => _selectedStockWhyData = null);
-                    nav.pivotToNode(id, nodeName: name);
-                  },
-                )
-              else if (nav.selectedNode != null || nav.selectedEdge != null)
-                EvidenceInspectorDrawer(
-                  selectedNode: nav.selectedNode,
-                  selectedEdge: nav.selectedEdge,
-                  onClose: () => nav.clearSelection(),
-                  onNavigateToNode: (targetId) => nav.pivotToNode(targetId),
-                ),
-            ],
-          ),
+                  // 2. Center Stage (Ranked List or Interactive Canvas with Event Timeline Slider)
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              _buildCenterContent(nav, isMobile: isMobile),
+
+                              // Top Floating Depth Level Selector
+                              if (_currentTab == MainViewTab.graphView && nav.networkData != null)
+                                Positioned(
+                                  top: 12,
+                                  left: 0,
+                                  right: 0,
+                                  child: Center(
+                                    child: DepthLevelSelector(
+                                      currentDepth: nav.depthLevel,
+                                      totalNodes: nav.networkData!.nodes.length,
+                                      onDepthChanged: (newDepth) => nav.setDepthLevel(newDepth),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        // Bottom Event Timeline Slider
+                        EventTimelineSlider(
+                          events: _eventTimeline,
+                          isLoading: _isLoadingEvents,
+                          selectedEventId: _selectedEventId,
+                          onSelectEvent: (ev) => _onSelectEvent(ev, isMobile: isMobile),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 3. Desktop Right Inspector Drawer
+                  if (!isMobile) ...[
+                    if (_selectedEventImpact != null)
+                      EventStockImpactDrawer(
+                        impactData: _selectedEventImpact!,
+                        onClose: () => setState(() {
+                          _selectedEventImpact = null;
+                          _selectedEventId = null;
+                        }),
+                        onPivotToStock: (t, n) {
+                          setState(() {
+                            _selectedEventImpact = null;
+                            _selectedEventId = null;
+                          });
+                          nav.pivotToNode(t, nodeName: n, nodeType: 'COMPANY');
+                        },
+                      )
+                    else if (_selectedStockWhyData != null)
+                      ThreeDepthWhyDrawer(
+                        stockData: _selectedStockWhyData!,
+                        onClose: () => setState(() => _selectedStockWhyData = null),
+                        onNodePivot: (id, name) {
+                          setState(() => _selectedStockWhyData = null);
+                          nav.pivotToNode(id, nodeName: name);
+                        },
+                      )
+                    else if (nav.selectedNode != null || nav.selectedEdge != null)
+                      EvidenceInspectorDrawer(
+                        selectedNode: nav.selectedNode,
+                        selectedEdge: nav.selectedEdge,
+                        onClose: () => nav.clearSelection(),
+                        onNavigateToNode: (targetId) => nav.pivotToNode(targetId),
+                      ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // Left Sidebar
-  Widget _buildLeftSidebar(NavigationController nav) {
+  // Mobile Bottom Navigation Bar
+  Widget _buildMobileBottomNav() {
     return Container(
-      width: 320,
       decoration: const BoxDecoration(
-        color: Color(0xFF1E293B), // Slate Surface
-        border: Border(right: BorderSide(color: Color(0xFF334155), width: 1)),
+        color: Color(0xFF1E293B),
+        border: Border(top: BorderSide(color: Color(0xFF334155))),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentTab.index,
+        backgroundColor: const Color(0xFF1E293B),
+        selectedItemColor: const Color(0xFF38BDF8),
+        unselectedItemColor: const Color(0xFF94A3B8),
+        type: BottomNavigationBarType.fixed,
+        selectedFontSize: 11,
+        unselectedFontSize: 10.5,
+        onTap: (idx) {
+          setState(() {
+            _currentTab = MainViewTab.values[idx];
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.flame_fill, size: 20),
+            label: '테마주 랭킹',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.chart_pie_fill, size: 20),
+            label: '여론조사',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.circle_grid_hex_fill, size: 20),
+            label: '관계도 맵',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.person_3_fill, size: 20),
+            label: '조직도',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.arrow_branch, size: 20),
+            label: '경로 탐색',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Left Sidebar
+  Widget _buildLeftSidebar(NavigationController nav, {required bool isMobile}) {
+    return Container(
+      width: isMobile ? double.infinity : 300,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B), // Slate Surface
+        border: isMobile ? null : const Border(right: BorderSide(color: Color(0xFF334155), width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. View Mode Switcher Tab
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            child: CupertinoSlidingSegmentedControl<MainViewTab>(
-              groupValue: _currentTab,
-              backgroundColor: const Color(0xFF0F172A),
-              thumbColor: const Color(0xFF38BDF8),
-              children: {
-                MainViewTab.themeStocks: _buildTabLabel('🏆 테마주 랭킹', _currentTab == MainViewTab.themeStocks),
-                MainViewTab.graphView: _buildTabLabel('관계도 맵', _currentTab == MainViewTab.graphView),
-                MainViewTab.orgTreeView: _buildTabLabel('조직도 목록', _currentTab == MainViewTab.orgTreeView),
-                MainViewTab.pathFinder: _buildTabLabel('경로 탐색기', _currentTab == MainViewTab.pathFinder),
-              },
-              onValueChanged: (val) {
-                if (val != null) setState(() => _currentTab = val);
-              },
+          // 1. Desktop View Mode Switcher Tab
+          if (!isMobile)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              child: CupertinoSlidingSegmentedControl<MainViewTab>(
+                groupValue: _currentTab,
+                backgroundColor: const Color(0xFF0F172A),
+                thumbColor: const Color(0xFF38BDF8),
+                children: {
+                  MainViewTab.themeStocks: _buildTabLabel('🏆 테마주', _currentTab == MainViewTab.themeStocks),
+                  MainViewTab.graphView: _buildTabLabel('관계도', _currentTab == MainViewTab.graphView),
+                  MainViewTab.orgTreeView: _buildTabLabel('조직도', _currentTab == MainViewTab.orgTreeView),
+                  MainViewTab.pathFinder: _buildTabLabel('경로', _currentTab == MainViewTab.pathFinder),
+                },
+                onValueChanged: (val) {
+                  if (val != null) setState(() => _currentTab = val);
+                },
+              ),
             ),
-          ),
 
           // 2. Left Panel Category Tabs (Quick Pivot vs Poll Leaderboard vs Filters)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             child: CupertinoSlidingSegmentedControl<LeftPanelTab>(
               groupValue: _leftPanelTab,
               backgroundColor: const Color(0xFF0F172A),
@@ -307,14 +434,14 @@ class _MainSplitViewState extends State<MainSplitView> {
 
           // 3. Dynamic Sub-Panel Body
           Expanded(
-            child: _buildLeftSubPanel(nav),
+            child: _buildLeftSubPanel(nav, isMobile: isMobile),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLeftSubPanel(NavigationController nav) {
+  Widget _buildLeftSubPanel(NavigationController nav, {required bool isMobile}) {
     switch (_leftPanelTab) {
       case LeftPanelTab.pollLeaderboard:
         return PollLeaderboardPanel(
@@ -326,6 +453,7 @@ class _MainSplitViewState extends State<MainSplitView> {
               _selectedStockWhyData = null;
               _selectedEventImpact = null;
             });
+            if (isMobile) Navigator.of(context).pop();
             nav.pivotToNode(pid, nodeName: pname, nodeType: 'PERSON');
           },
         );
@@ -374,6 +502,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '중앙대 법대 / 성남 CEO포럼',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_한동훈_197304_M',
@@ -381,6 +510,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '현대고 / 서울대 법대 / 사법 27기',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_조국_196504_M',
@@ -388,6 +518,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '혜광고 / 서울대 법대 / 버클리',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_오세훈_196101_M',
@@ -395,6 +526,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '대일고 / 고려대 법대 / 사법 16기',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_홍준표_195412_M',
@@ -402,6 +534,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '영남고 / 고려대 법대 / 사법 14기',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_이준석_198503_M',
@@ -409,6 +542,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '서울과학고 / 하버드대 컴퓨터',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: 'P_이재용_196806_M',
@@ -416,6 +550,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '삼성그룹 총수 / 오너 3세',
                 isCompany: false,
                 nav: nav,
+                isMobile: isMobile,
               ),
               _buildPivotListItem(
                 id: '005930',
@@ -423,6 +558,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                 subtitle: '반도체/스마트폰 · 이재용 회장',
                 isCompany: true,
                 nav: nav,
+                isMobile: isMobile,
               ),
             ],
           ),
@@ -432,11 +568,11 @@ class _MainSplitViewState extends State<MainSplitView> {
 
   Widget _buildTabLabel(String text, bool isSelected) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 11.5,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
           color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
         ),
@@ -450,7 +586,7 @@ class _MainSplitViewState extends State<MainSplitView> {
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: FontWeight.w700,
           color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
         ),
@@ -464,6 +600,7 @@ class _MainSplitViewState extends State<MainSplitView> {
     required String subtitle,
     required bool isCompany,
     required NavigationController nav,
+    required bool isMobile,
   }) {
     final isCurrent = nav.currentFocusId == id || nav.currentFocusName == name.split(' ')[0];
 
@@ -506,6 +643,7 @@ class _MainSplitViewState extends State<MainSplitView> {
               _selectedStockWhyData = null;
               _selectedEventImpact = null;
             });
+            if (isMobile) Navigator.of(context).pop();
             nav.pivotToNode(id, nodeName: name.split(' ')[0], nodeType: isCompany ? 'COMPANY' : 'PERSON');
           },
         ),
@@ -514,17 +652,17 @@ class _MainSplitViewState extends State<MainSplitView> {
   }
 
   // Center Stage Content
-  Widget _buildCenterContent(NavigationController nav) {
+  Widget _buildCenterContent(NavigationController nav, {required bool isMobile}) {
     if (nav.isLoading) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CupertinoActivityIndicator(radius: 18, color: Color(0xFF38BDF8)),
-            SizedBox(height: 14),
+            CupertinoActivityIndicator(radius: 16, color: Color(0xFF38BDF8)),
+            SizedBox(height: 12),
             Text(
               'DART 시냅스 네트워크 연산 중...',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
             ),
           ],
         ),
@@ -536,10 +674,10 @@ class _MainSplitViewState extends State<MainSplitView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(CupertinoIcons.exclamationmark_triangle_fill, size: 36, color: Color(0xFFEF4444)),
-            const SizedBox(height: 12),
+            const Icon(CupertinoIcons.exclamationmark_triangle_fill, size: 32, color: Color(0xFFEF4444)),
+            const SizedBox(height: 10),
             Text(nav.errorMessage!, style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             CupertinoButton.filled(
               onPressed: () => nav.loadNetwork(),
               child: const Text('다시 시도'),
@@ -551,7 +689,26 @@ class _MainSplitViewState extends State<MainSplitView> {
 
     switch (_currentTab) {
       case MainViewTab.themeStocks:
-        return _buildThemeStocksStage(nav);
+        return _buildThemeStocksStage(nav, isMobile: isMobile);
+
+      case MainViewTab.pollView:
+        return Container(
+          color: const Color(0xFF0F172A),
+          padding: const EdgeInsets.all(12),
+          child: PollLeaderboardPanel(
+            pollData: _pollLeaderboard,
+            isLoading: _isLoadingPolls,
+            currentPersonId: nav.currentFocusId,
+            onSelectCandidate: (pid, pname) {
+              setState(() {
+                _selectedStockWhyData = null;
+                _selectedEventImpact = null;
+                _currentTab = MainViewTab.themeStocks;
+              });
+              nav.pivotToNode(pid, nodeName: pname, nodeType: 'PERSON');
+            },
+          ),
+        );
 
       case MainViewTab.graphView:
         if (nav.networkData == null || nav.networkData!.nodes.isEmpty) {
@@ -565,34 +722,61 @@ class _MainSplitViewState extends State<MainSplitView> {
           highlightPathNodeIds: nav.highlightPathNodeIds,
           onNodeSelected: (node) {
             nav.selectNode(node);
-            if (node.id != nav.currentFocusId) {
+            if (isMobile) {
+              _showMobileDrawer(
+                context,
+                EvidenceInspectorDrawer(
+                  selectedNode: node,
+                  onClose: () => Navigator.of(context).pop(),
+                  onNavigateToNode: (targetId) {
+                    Navigator.of(context).pop();
+                    nav.pivotToNode(targetId);
+                  },
+                ),
+              );
+            } else if (node.id != nav.currentFocusId) {
               nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type);
             }
           },
-          onEdgeSelected: (edge) => nav.selectEdge(edge),
+          onEdgeSelected: (edge) {
+            nav.selectEdge(edge);
+            if (isMobile) {
+              _showMobileDrawer(
+                context,
+                EvidenceInspectorDrawer(
+                  selectedEdge: edge,
+                  onClose: () => Navigator.of(context).pop(),
+                  onNavigateToNode: (targetId) {
+                    Navigator.of(context).pop();
+                    nav.pivotToNode(targetId);
+                  },
+                ),
+              );
+            }
+          },
           onNodeDoubleTapped: (node) => nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type),
         );
 
       case MainViewTab.orgTreeView:
-        return _buildOrgTreeStage(nav);
+        return _buildOrgTreeStage(nav, isMobile: isMobile);
 
       case MainViewTab.pathFinder:
-        return _buildPathFinderStage(nav);
+        return _buildPathFinderStage(nav, isMobile: isMobile);
     }
   }
 
   // 🏆 1. Investor Decision-Centric Theme Stock Ranking & 3-Depth Why Stage
-  Widget _buildThemeStocksStage(NavigationController nav) {
+  Widget _buildThemeStocksStage(NavigationController nav, {required bool isMobile}) {
     if (_isLoadingThemeStocks) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CupertinoActivityIndicator(radius: 18, color: Color(0xFFF59E0B)),
-            SizedBox(height: 14),
+            CupertinoActivityIndicator(radius: 16, color: Color(0xFFF59E0B)),
+            SizedBox(height: 12),
             Text(
               'Kin-Score 0~100점 및 3-Depth 인과 사슬 연산 중...',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
             ),
           ],
         ),
@@ -613,14 +797,14 @@ class _MainSplitViewState extends State<MainSplitView> {
       child: Scrollbar(
         thumbVisibility: true,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isMobile ? 12 : 20),
           children: [
             // Top Header: Center Person Profile & Theme Analytics Banner
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 14 : 18),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
                 boxShadow: [
                   BoxShadow(
@@ -633,14 +817,14 @@ class _MainSplitViewState extends State<MainSplitView> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: const Color(0xFF38BDF8).withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(CupertinoIcons.person_crop_circle_fill, size: 36, color: Color(0xFF38BDF8)),
+                    child: const Icon(CupertinoIcons.person_crop_circle_fill, size: 30, color: Color(0xFF38BDF8)),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,15 +833,15 @@ class _MainSplitViewState extends State<MainSplitView> {
                           children: [
                             Text(
                               personName,
-                              style: const TextStyle(
-                                fontSize: 20,
+                              style: TextStyle(
+                                fontSize: isMobile ? 16 : 19,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFFF8FAFC),
+                                color: const Color(0xFFF8FAFC),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF0F172A),
                                 borderRadius: BorderRadius.circular(6),
@@ -665,33 +849,35 @@ class _MainSplitViewState extends State<MainSplitView> {
                               ),
                               child: Text(
                                 personTitle,
-                                style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11.5, fontWeight: FontWeight.w700),
+                                style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w700),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           '🎓 $almaMater  |  ⚖️ $cohort  |  🏠 $hometown',
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFF59E0B)),
                     ),
                     child: Column(
                       children: [
-                        const Text('평균 결속도', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                        const Text('평균 결속', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
                         const SizedBox(height: 2),
                         Text(
                           '$avgScore점',
-                          style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 16, fontWeight: FontWeight.w900),
+                          style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 14, fontWeight: FontWeight.w900),
                         ),
                       ],
                     ),
@@ -699,25 +885,26 @@ class _MainSplitViewState extends State<MainSplitView> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Section Title
             Row(
               children: [
-                const Icon(CupertinoIcons.flame_fill, color: Color(0xFFF59E0B), size: 20),
-                const SizedBox(width: 8),
+                const Icon(CupertinoIcons.flame_fill, color: Color(0xFFF59E0B), size: 18),
+                const SizedBox(width: 6),
                 Text(
-                  '[$personName] 연관 테마주 Kin-Score 랭킹 (${stocks.length}개 종목)',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFFF8FAFC)),
+                  '[$personName] 연관 테마주 랭킹 (${stocks.length}개)',
+                  style: TextStyle(fontSize: isMobile ? 14.5 : 16.5, fontWeight: FontWeight.w800, color: const Color(0xFFF8FAFC)),
                 ),
                 const Spacer(),
-                const Text(
-                  '💡 종목 카드를 클릭하면 3단계 인과 근거(Why) 상세를 확인합니다.',
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                ),
+                if (!isMobile)
+                  const Text(
+                    '💡 카드를 클릭하면 3단계 인과 근거(Why) 상세를 확인합니다.',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5),
+                  ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // Ranked Stock List Cards
             if (stocks.isEmpty) ...[
@@ -764,12 +951,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                   marketCap: cap,
                   currentPrice: price,
                   priceChangeRate: rate,
-                  onTap: () {
-                    setState(() {
-                      _selectedEventImpact = null;
-                      _selectedStockWhyData = stock;
-                    });
-                  },
+                  onTap: () => _onStockCardTapped(stock, isMobile: isMobile),
                   onPivotToStock: (t, n) => nav.pivotToNode(t, nodeName: n, nodeType: 'COMPANY'),
                 );
               }),
@@ -780,25 +962,25 @@ class _MainSplitViewState extends State<MainSplitView> {
     );
   }
 
-  Widget _buildOrgTreeStage(NavigationController nav) {
+  Widget _buildOrgTreeStage(NavigationController nav, {required bool isMobile}) {
     final nodes = nav.networkData?.nodes ?? [];
 
     return Scrollbar(
       thumbVisibility: true,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 12 : 20),
         children: [
           Row(
             children: [
-              const Icon(CupertinoIcons.person_3_fill, color: Color(0xFF38BDF8), size: 20),
-              const SizedBox(width: 10),
+              const Icon(CupertinoIcons.person_3_fill, color: Color(0xFF38BDF8), size: 18),
+              const SizedBox(width: 8),
               Text(
-                '${nav.currentFocusName} 기준 DART 지배구조 및 임원 목록 (${nodes.length}명)',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFFF8FAFC)),
+                '${nav.currentFocusName} 기준 DART 임원 목록 (${nodes.length}명)',
+                style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.w800, color: const Color(0xFFF8FAFC)),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ...nodes.map((node) {
             final isCompany = node.type == 'COMPANY';
             return Card(
@@ -820,10 +1002,10 @@ class _MainSplitViewState extends State<MainSplitView> {
                     backgroundColor: const Color(0xFF38BDF8).withOpacity(0.15),
                     foregroundColor: const Color(0xFF38BDF8),
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
-                  icon: const Icon(CupertinoIcons.scope, size: 12),
-                  label: const Text('피벗 전환', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  icon: const Icon(CupertinoIcons.scope, size: 11),
+                  label: const Text('피벗 전환', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
                   onPressed: () => nav.pivotToNode(node.id, nodeName: node.name, nodeType: node.type),
                 ),
                 onTap: () => nav.selectNode(node),
@@ -835,20 +1017,20 @@ class _MainSplitViewState extends State<MainSplitView> {
     );
   }
 
-  Widget _buildPathFinderStage(NavigationController nav) {
+  Widget _buildPathFinderStage(NavigationController nav, {required bool isMobile}) {
     return Container(
       color: const Color(0xFF0F172A),
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(CupertinoIcons.arrow_branch, color: Color(0xFF38BDF8), size: 20),
-              const SizedBox(width: 10),
-              const Text(
-                '인맥 연결고리(Shortest Path) 탐색기 (RelSci 모드)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFFF8FAFC)),
+              const Icon(CupertinoIcons.arrow_branch, color: Color(0xFF38BDF8), size: 18),
+              const SizedBox(width: 8),
+              Text(
+                '인맥 연결고리 탐색기',
+                style: TextStyle(fontSize: isMobile ? 14.5 : 16, fontWeight: FontWeight.w800, color: const Color(0xFFF8FAFC)),
               ),
               const Spacer(),
               ElevatedButton.icon(
@@ -856,21 +1038,22 @@ class _MainSplitViewState extends State<MainSplitView> {
                   backgroundColor: const Color(0xFF38BDF8),
                   foregroundColor: const Color(0xFF0F172A),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 ),
-                icon: const Icon(CupertinoIcons.play_fill, size: 14),
-                label: const Text('연결고리 분석 실행', style: TextStyle(fontWeight: FontWeight.w700)),
+                icon: const Icon(CupertinoIcons.play_fill, size: 12),
+                label: const Text('분석 실행', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                 onPressed: () => nav.executePathFinder(),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           if (nav.pathSteps.isNotEmpty) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
               ),
               child: Column(
@@ -878,8 +1061,8 @@ class _MainSplitViewState extends State<MainSplitView> {
                 children: [
                   Row(
                     children: [
-                      const Icon(CupertinoIcons.sparkles, color: Color(0xFF38BDF8), size: 16),
-                      const SizedBox(width: 8),
+                      const Icon(CupertinoIcons.sparkles, color: Color(0xFF38BDF8), size: 15),
+                      const SizedBox(width: 6),
                       const Text('검증된 DART 최단 연결 경로', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700)),
                       const Spacer(),
                       IconButton(
@@ -888,14 +1071,14 @@ class _MainSplitViewState extends State<MainSplitView> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   ...nav.pathSteps.map((step) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
-                            const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFF10B981), size: 16),
-                            const SizedBox(width: 10),
-                            Text(step, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                            const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFF10B981), size: 15),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(step, style: const TextStyle(color: Colors.white, fontSize: 12.5))),
                           ],
                         ),
                       )),
@@ -905,9 +1088,9 @@ class _MainSplitViewState extends State<MainSplitView> {
           ] else ...[
             const Center(
               child: Padding(
-                padding: EdgeInsets.only(top: 80),
+                padding: EdgeInsets.only(top: 60),
                 child: Text(
-                  '상단의 [연결고리 분석 실행] 버튼을 눌러 인물-기업 간 최단 인맥을 분석하세요.',
+                  '상단의 [분석 실행] 버튼을 눌러 인물-기업 간 최단 인맥을 분석하세요.',
                   style: TextStyle(color: Color(0xFF94A3B8)),
                 ),
               ),
