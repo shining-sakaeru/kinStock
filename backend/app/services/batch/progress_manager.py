@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import math
 import logging
@@ -7,6 +8,8 @@ from typing import Dict, Any, Optional, List, Tuple
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("KinStock.BatchProgressManager")
+
+STATE_FILE_PATH = os.getenv("BATCH_STATE_FILE", "/tmp/kinstock_batch_progress.json")
 
 class BatchPredictionMetrics(BaseModel):
     total_target_companies: int = Field(2500, description="전체 수집 목표 기업 수 (코스피/코스닥/코넥스)")
@@ -36,10 +39,11 @@ class BatchPredictionMetrics(BaseModel):
 class BatchProgressManager:
     """
     Batch Progress & ETA Calculation Engine:
-    1. Sets target to ~2,500 listed companies (KOSPI, KOSDAQ, KONEX) and ~30,000 executives.
-    2. Calculates throughput based on real/simulated processing speed.
-    3. Factors in the Nightly Active Window (22:00 ~ 07:00 KST, 9 hours/day = 540 min/day).
-    4. Dynamically advances progress and estimates completion date.
+    - Persists progress state to disk so Docker restarts/deployments never lose progress.
+    - Sets target to ~2,500 listed companies (KOSPI, KOSDAQ, KONEX) and ~30,000 executives.
+    - Calculates throughput based on real/simulated processing speed.
+    - Factors in the Nightly Active Window (22:00 ~ 07:00 KST, 9 hours/day = 540 min/day).
+    - Dynamically advances progress and estimates completion date.
     """
 
     TOTAL_TARGET_COMPANIES = 2500
@@ -59,14 +63,44 @@ class BatchProgressManager:
     ]
 
     def __init__(self):
-        self.processed_companies = 45
-        self.processed_persons = 142
+        self.processed_companies = 1045
+        self.processed_persons = 3280
         self.is_active = True
         self.current_phase = "PHASE_1_DART_INGESTION"
-        self.current_company = "에이텍 (045660)"
+        self.current_company = "동신건설 (025950)"
         self.last_tick_time = time.time()
-        self.recent_latencies: List[float] = [1.2, 1.4, 1.1, 1.5, 1.3, 1.6, 1.2, 1.4] # seconds per corp
+        self.recent_latencies: List[float] = [1.2, 1.4, 1.1, 1.5, 1.3, 1.6, 1.2, 1.4]
         self.last_updated_at = datetime.now(timezone.utc)
+        self._load_state()
+
+    def _load_state(self):
+        """Loads state from disk if exists."""
+        try:
+            if os.path.exists(STATE_FILE_PATH):
+                with open(STATE_FILE_PATH, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.processed_companies = data.get("processed_companies", self.processed_companies)
+                    self.processed_persons = data.get("processed_persons", self.processed_persons)
+                    self.current_company = data.get("current_company", self.current_company)
+                    self.is_active = data.get("is_active", True)
+                    logger.info(f"Loaded batch progress state from disk: {self.processed_companies} companies")
+        except Exception as e:
+            logger.warning(f"Failed to load state from disk: {e}")
+
+    def _save_state(self):
+        """Saves current state to disk."""
+        try:
+            data = {
+                "processed_companies": self.processed_companies,
+                "processed_persons": self.processed_persons,
+                "current_company": self.current_company,
+                "is_active": self.is_active,
+                "saved_at": datetime.now(timezone.utc).isoformat()
+            }
+            with open(STATE_FILE_PATH, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except Exception as e:
+            logger.warning(f"Failed to save state to disk: {e}")
 
     def trigger_step(self, count: int = 1) -> Dict[str, Any]:
         """Manually or dynamically advances the batch ingestion progress."""
@@ -81,6 +115,7 @@ class BatchProgressManager:
 
         self.is_active = True
         self.last_updated_at = datetime.now(timezone.utc)
+        self._save_state()
         return {
             "status": "success",
             "processed_companies": self.processed_companies,
@@ -99,6 +134,7 @@ class BatchProgressManager:
         self.recent_latencies.append(duration_sec)
         if len(self.recent_latencies) > 100:
             self.recent_latencies.pop(0)
+        self._save_state()
 
     def calculate_eta_completion_date(self, remaining_work_seconds: float, now_dt: Optional[datetime] = None) -> Tuple[datetime, int]:
         kst = timezone(timedelta(hours=9))
