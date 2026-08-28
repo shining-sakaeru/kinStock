@@ -3,21 +3,31 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../controllers/navigation_controller.dart';
 import '../core/api/api_client.dart';
+import '../core/models/event_poll_models.dart';
 import '../widgets/common/kinstock_app_bar.dart';
 import '../widgets/drawer/evidence_inspector_drawer.dart';
 import '../widgets/drawer/three_depth_why_drawer.dart';
+import '../widgets/events/event_stock_impact_drawer.dart';
+import '../widgets/events/event_timeline_slider.dart';
 import '../widgets/filter/synapse_filter_bar.dart';
 import '../widgets/analysis/multi_perspective_selector.dart';
 import '../widgets/cards/person_bond_radar_card.dart';
 import '../widgets/cards/theme_stock_rank_card.dart';
 import '../widgets/graph/depth_level_selector.dart';
 import '../widgets/graph/synapse_graph_canvas.dart';
+import '../widgets/polls/poll_leaderboard_panel.dart';
 
 enum MainViewTab {
   themeStocks, // 🏆 테마주 랭킹 (Why Engine)
   graphView,   // 🕸️ 관계도 맵 (Graph)
   orgTreeView, // 👥 조직도 목록 (Org)
   pathFinder,  // 🔍 경로 탐색기 (Path)
+}
+
+enum LeftPanelTab {
+  themeRankings, // 🏆 추천 인물/기업
+  pollLeaderboard, // 📊 여론조사 랭킹
+  filters,       // ⚙️ 필터 & 관점
 }
 
 class MainSplitView extends StatefulWidget {
@@ -32,6 +42,7 @@ class MainSplitView extends StatefulWidget {
 class _MainSplitViewState extends State<MainSplitView> {
   late NavigationController _navController;
   MainViewTab _currentTab = MainViewTab.themeStocks;
+  LeftPanelTab _leftPanelTab = LeftPanelTab.themeRankings;
   PerspectiveMode _perspective = PerspectiveMode.comprehensive;
   int? _seniorityGap;
   final TransformationController _transformController = TransformationController();
@@ -41,18 +52,29 @@ class _MainSplitViewState extends State<MainSplitView> {
   bool _isLoadingThemeStocks = false;
   String _lastLoadedFocusId = '';
 
+  // Polls & Events State
+  PollLeaderboardModel? _pollLeaderboard;
+  bool _isLoadingPolls = false;
+  List<PoliticalEventModel> _eventTimeline = [];
+  bool _isLoadingEvents = false;
+  EventStockImpactModel? _selectedEventImpact;
+  String? _selectedEventId;
+
   @override
   void initState() {
     super.initState();
     _navController = NavigationController(apiClient: widget.apiClient);
     _navController.addListener(_onNavStateChanged);
     _loadThemeStocks(_navController.currentFocusId);
+    _loadPolls();
+    _loadEvents(_navController.currentFocusId);
   }
 
   void _onNavStateChanged() {
     if (_lastLoadedFocusId != _navController.currentFocusId) {
       _lastLoadedFocusId = _navController.currentFocusId;
       _loadThemeStocks(_navController.currentFocusId);
+      _loadEvents(_navController.currentFocusId);
     }
     if (mounted) setState(() {});
   }
@@ -71,6 +93,57 @@ class _MainSplitViewState extends State<MainSplitView> {
       if (mounted) {
         setState(() => _isLoadingThemeStocks = false);
       }
+    }
+  }
+
+  Future<void> _loadPolls() async {
+    setState(() => _isLoadingPolls = true);
+    try {
+      final res = await widget.apiClient.getPollLeaderboard();
+      if (mounted) {
+        setState(() {
+          _pollLeaderboard = res;
+          _isLoadingPolls = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingPolls = false);
+      }
+    }
+  }
+
+  Future<void> _loadEvents(String personId) async {
+    setState(() => _isLoadingEvents = true);
+    try {
+      final res = await widget.apiClient.getEventTimeline(personId);
+      if (mounted) {
+        setState(() {
+          _eventTimeline = res;
+          _isLoadingEvents = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingEvents = false);
+      }
+    }
+  }
+
+  Future<void> _onSelectEvent(PoliticalEventModel event) async {
+    setState(() {
+      _selectedEventId = event.eventId;
+      _selectedStockWhyData = null;
+    });
+    try {
+      final impact = await widget.apiClient.getEventStockImpact(event.eventId);
+      if (mounted) {
+        setState(() {
+          _selectedEventImpact = impact;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading event stock impact: $e');
     }
   }
 
@@ -102,35 +175,64 @@ class _MainSplitViewState extends State<MainSplitView> {
           appBar: KinStockAppBar(navController: nav),
           body: Row(
             children: [
-              // 1. Left Sidebar (Filters, View Modes, Node Hubs)
+              // 1. Left Sidebar (Filters, View Modes, Polls, Node Hubs)
               _buildLeftSidebar(nav),
 
-              // 2. Center Stage (Ranked List or Interactive Canvas)
+              // 2. Center Stage (Ranked List or Interactive Canvas with Event Timeline Slider)
               Expanded(
-                child: Stack(
+                child: Column(
                   children: [
-                    _buildCenterContent(nav),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          _buildCenterContent(nav),
 
-                    // Top Floating Depth Level Selector
-                    if (_currentTab == MainViewTab.graphView && nav.networkData != null)
-                      Positioned(
-                        top: 16,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: DepthLevelSelector(
-                            currentDepth: nav.depthLevel,
-                            totalNodes: nav.networkData!.nodes.length,
-                            onDepthChanged: (newDepth) => nav.setDepthLevel(newDepth),
-                          ),
-                        ),
+                          // Top Floating Depth Level Selector
+                          if (_currentTab == MainViewTab.graphView && nav.networkData != null)
+                            Positioned(
+                              top: 16,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: DepthLevelSelector(
+                                  currentDepth: nav.depthLevel,
+                                  totalNodes: nav.networkData!.nodes.length,
+                                  onDepthChanged: (newDepth) => nav.setDepthLevel(newDepth),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
+
+                    // Bottom Event Timeline Slider
+                    EventTimelineSlider(
+                      events: _eventTimeline,
+                      isLoading: _isLoadingEvents,
+                      selectedEventId: _selectedEventId,
+                      onSelectEvent: _onSelectEvent,
+                    ),
                   ],
                 ),
               ),
 
-              // 3. Right Inspector Drawer (3-Depth Why Drawer OR Evidence Inspector Drawer)
-              if (_selectedStockWhyData != null)
+              // 3. Right Inspector Drawer (Event Impact OR 3-Depth Why OR Evidence Inspector)
+              if (_selectedEventImpact != null)
+                EventStockImpactDrawer(
+                  impactData: _selectedEventImpact!,
+                  onClose: () => setState(() {
+                    _selectedEventImpact = null;
+                    _selectedEventId = null;
+                  }),
+                  onPivotToStock: (t, n) {
+                    setState(() {
+                      _selectedEventImpact = null;
+                      _selectedEventId = null;
+                    });
+                    nav.pivotToNode(t, nodeName: n, nodeType: 'COMPANY');
+                  },
+                )
+              else if (_selectedStockWhyData != null)
                 ThreeDepthWhyDrawer(
                   stockData: _selectedStockWhyData!,
                   onClose: () => setState(() => _selectedStockWhyData = null),
@@ -184,125 +286,148 @@ class _MainSplitViewState extends State<MainSplitView> {
             ),
           ),
 
-          // 2. Synapse Filter Bar
-          SynapseFilterBar(
-            selectedFilters: nav.activeFilters,
-            onFilterToggled: (type) => nav.toggleFilter(type),
+          // 2. Left Panel Category Tabs (Quick Pivot vs Poll Leaderboard vs Filters)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: CupertinoSlidingSegmentedControl<LeftPanelTab>(
+              groupValue: _leftPanelTab,
+              backgroundColor: const Color(0xFF0F172A),
+              thumbColor: const Color(0xFF1E293B),
+              children: {
+                LeftPanelTab.themeRankings: _buildSubTabLabel('👑 중심 인물', _leftPanelTab == LeftPanelTab.themeRankings),
+                LeftPanelTab.pollLeaderboard: _buildSubTabLabel('📊 여론조사', _leftPanelTab == LeftPanelTab.pollLeaderboard),
+                LeftPanelTab.filters: _buildSubTabLabel('⚙️ 분석 관점', _leftPanelTab == LeftPanelTab.filters),
+              },
+              onValueChanged: (val) {
+                if (val != null) setState(() => _leftPanelTab = val);
+              },
+            ),
           ),
-
-          // 3. Multi-Perspective Analysis Selector (Alumni, Legal, Regional, Chaerok)
-          MultiPerspectiveSelector(
-            currentPerspective: _perspective,
-            selectedSeniorityGap: _seniorityGap,
-            onPerspectiveChanged: (p) {
-              setState(() => _perspective = p);
-              final modeStr = p == PerspectiveMode.alumniFocused
-                  ? 'ALUMNI_FOCUSED'
-                  : p == PerspectiveMode.legalElite
-                      ? 'LEGAL_ELITE'
-                      : p == PerspectiveMode.regionalTies
-                          ? 'REGIONAL_TIES'
-                          : p == PerspectiveMode.chaerokNetwork
-                              ? 'CHAEROK_NETWORK'
-                              : 'COMPREHENSIVE';
-              nav.setPerspective(modeStr);
-            },
-            onSeniorityGapChanged: (g) {
-              setState(() => _seniorityGap = g);
-              nav.setSeniorityGap(g);
-            },
-          ),
-
           const Divider(height: 1, color: Color(0xFF334155)),
 
-          // 4. Quick Node Pivot Carousel / List (Zero Overflow Scrollbar)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Row(
-              children: [
-                Icon(CupertinoIcons.sparkles, size: 14, color: Color(0xFFF59E0B)),
-                SizedBox(width: 6),
-                Text(
-                  '추천 중심 인물 / 기업 (Quick Pivot)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
+          // 3. Dynamic Sub-Panel Body
           Expanded(
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                children: [
-                  _buildPivotListItem(
-                    id: 'P_이재용_196806_M',
-                    name: '이재용 (삼성전자 회장)',
-                    subtitle: '삼성그룹 총수 / 오너 3세',
-                    isCompany: false,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: 'P_이재명_196410_M',
-                    name: '이재명 (더불어민주당 대표)',
-                    subtitle: '중앙대 법대 / 성남 CEO포럼',
-                    isCompany: false,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: 'P_한동훈_197304_M',
-                    name: '한동훈 (국민의힘 대표)',
-                    subtitle: '현대고 / 서울대 법대 / 사법 27기',
-                    isCompany: false,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: '005930',
-                    name: '삼성전자 (005930)',
-                    subtitle: '반도체/스마트폰 · 이재용 회장',
-                    isCompany: true,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: 'P_최태원_196012_M',
-                    name: '최태원 (SK그룹 회장)',
-                    subtitle: '신일고 / 고려대 물리 / 시카고대',
-                    isCompany: false,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: '000660',
-                    name: 'SK하이닉스 (000660)',
-                    subtitle: 'HBM 반도체 · 최태원 회장',
-                    isCompany: true,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: 'P_정의선_197010_M',
-                    name: '정의선 (현대차그룹 회장)',
-                    subtitle: '휘문고 / 고려대 경영 / USF',
-                    isCompany: false,
-                    nav: nav,
-                  ),
-                  _buildPivotListItem(
-                    id: '005380',
-                    name: '현대자동차 (005380)',
-                    subtitle: '완성차/모빌리티 · 정의선 회장',
-                    isCompany: true,
-                    nav: nav,
-                  ),
-                ],
-              ),
-            ),
+            child: _buildLeftSubPanel(nav),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildLeftSubPanel(NavigationController nav) {
+    switch (_leftPanelTab) {
+      case LeftPanelTab.pollLeaderboard:
+        return PollLeaderboardPanel(
+          pollData: _pollLeaderboard,
+          isLoading: _isLoadingPolls,
+          currentPersonId: nav.currentFocusId,
+          onSelectCandidate: (pid, pname) {
+            setState(() {
+              _selectedStockWhyData = null;
+              _selectedEventImpact = null;
+            });
+            nav.pivotToNode(pid, nodeName: pname, nodeType: 'PERSON');
+          },
+        );
+
+      case LeftPanelTab.filters:
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            SynapseFilterBar(
+              selectedFilters: nav.activeFilters,
+              onFilterToggled: (type) => nav.toggleFilter(type),
+            ),
+            MultiPerspectiveSelector(
+              currentPerspective: _perspective,
+              selectedSeniorityGap: _seniorityGap,
+              onPerspectiveChanged: (p) {
+                setState(() => _perspective = p);
+                final modeStr = p == PerspectiveMode.alumniFocused
+                    ? 'ALUMNI_FOCUSED'
+                    : p == PerspectiveMode.legalElite
+                        ? 'LEGAL_ELITE'
+                        : p == PerspectiveMode.regionalTies
+                            ? 'REGIONAL_TIES'
+                            : p == PerspectiveMode.chaerokNetwork
+                                ? 'CHAEROK_NETWORK'
+                                : 'COMPREHENSIVE';
+                nav.setPerspective(modeStr);
+              },
+              onSeniorityGapChanged: (g) {
+                setState(() => _seniorityGap = g);
+                nav.setSeniorityGap(g);
+              },
+            ),
+          ],
+        );
+
+      case LeftPanelTab.themeRankings:
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            children: [
+              _buildPivotListItem(
+                id: 'P_이재명_196410_M',
+                name: '이재명 (더불어민주당 대표)',
+                subtitle: '중앙대 법대 / 성남 CEO포럼',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_한동훈_197304_M',
+                name: '한동훈 (국민의힘 대표)',
+                subtitle: '현대고 / 서울대 법대 / 사법 27기',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_조국_196504_M',
+                name: '조국 (조국혁신당 대표)',
+                subtitle: '혜광고 / 서울대 법대 / 버클리',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_오세훈_196101_M',
+                name: '오세훈 (서울특별시장)',
+                subtitle: '대일고 / 고려대 법대 / 사법 16기',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_홍준표_195412_M',
+                name: '홍준표 (대구광역시장)',
+                subtitle: '영남고 / 고려대 법대 / 사법 14기',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_이준석_198503_M',
+                name: '이준석 (개혁신당 의원)',
+                subtitle: '서울과학고 / 하버드대 컴퓨터',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: 'P_이재용_196806_M',
+                name: '이재용 (삼성전자 회장)',
+                subtitle: '삼성그룹 총수 / 오너 3세',
+                isCompany: false,
+                nav: nav,
+              ),
+              _buildPivotListItem(
+                id: '005930',
+                name: '삼성전자 (005930)',
+                subtitle: '반도체/스마트폰 · 이재용 회장',
+                isCompany: true,
+                nav: nav,
+              ),
+            ],
+          ),
+        );
+    }
   }
 
   Widget _buildTabLabel(String text, bool isSelected) {
@@ -319,6 +444,20 @@ class _MainSplitViewState extends State<MainSplitView> {
     );
   }
 
+  Widget _buildSubTabLabel(String text, bool isSelected) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPivotListItem({
     required String id,
     required String name,
@@ -326,7 +465,7 @@ class _MainSplitViewState extends State<MainSplitView> {
     required bool isCompany,
     required NavigationController nav,
   }) {
-    final isCurrent = nav.currentFocusId == id;
+    final isCurrent = nav.currentFocusId == id || nav.currentFocusName == name.split(' ')[0];
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -363,8 +502,11 @@ class _MainSplitViewState extends State<MainSplitView> {
               ? const Icon(CupertinoIcons.checkmark_circle_fill, size: 14, color: Color(0xFF38BDF8))
               : const Icon(CupertinoIcons.arrow_right, size: 12, color: Color(0xFF475569)),
           onTap: () {
-            setState(() => _selectedStockWhyData = null);
-            nav.pivotToNode(id, nodeName: name, nodeType: isCompany ? 'COMPANY' : 'PERSON');
+            setState(() {
+              _selectedStockWhyData = null;
+              _selectedEventImpact = null;
+            });
+            nav.pivotToNode(id, nodeName: name.split(' ')[0], nodeType: isCompany ? 'COMPANY' : 'PERSON');
           },
         ),
       ),
@@ -624,6 +766,7 @@ class _MainSplitViewState extends State<MainSplitView> {
                   priceChangeRate: rate,
                   onTap: () {
                     setState(() {
+                      _selectedEventImpact = null;
                       _selectedStockWhyData = stock;
                     });
                   },

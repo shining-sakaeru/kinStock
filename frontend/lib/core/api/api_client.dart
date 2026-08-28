@@ -13,6 +13,7 @@ import '../../features/network_stock/data/models/weight_settings_model.dart';
 import '../../features/network_stock/data/models/stock_related_figures_model.dart';
 import '../../features/network_stock/data/models/search_model.dart';
 import '../../features/network_stock/data/models/synapse_network_model.dart';
+import '../models/event_poll_models.dart';
 
 class FigureStocksCombinedResult {
   final PersonModel figure;
@@ -80,6 +81,55 @@ class ApiClient {
     } catch (e) {
       debugPrint('ApiClient.getPersonThemeStocks error: $e, using mock fallback');
       return _getMockPersonThemeStocks(personId);
+    }
+  }
+
+  // 1-2. Poll Aggregator & Leaderboard API
+  Future<PollLeaderboardModel> getPollLeaderboard() async {
+    final uri = Uri.parse('$baseUrl/polls/leaderboard');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return PollLeaderboardModel.fromJson(map);
+      }
+      throw Exception('Failed to load poll leaderboard: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getPollLeaderboard error: $e, using mock fallback');
+      return _getMockPollLeaderboard();
+    }
+  }
+
+  // 1-3. Political Event Timeline API
+  Future<List<PoliticalEventModel>> getEventTimeline(String personId) async {
+    final uri = Uri.parse('$baseUrl/events/timeline/$personId');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        final list = (map['events'] as List<dynamic>?) ?? [];
+        return list.map((e) => PoliticalEventModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+      throw Exception('Failed to load event timeline: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getEventTimeline error: $e, using mock fallback');
+      return _getMockEventTimeline(personId);
+    }
+  }
+
+  // 1-4. Event-Study Stock Price Impact API
+  Future<EventStockImpactModel> getEventStockImpact(String eventId) async {
+    final uri = Uri.parse('$baseUrl/analytics/stock-impact/$eventId');
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        return EventStockImpactModel.fromJson(map);
+      }
+      throw Exception('Failed to load event stock impact: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('ApiClient.getEventStockImpact error: $e, using mock fallback');
+      return _getMockEventStockImpact(eventId);
     }
   }
 
@@ -818,5 +868,144 @@ class ApiClient {
         }
       ]
     };
+  }
+
+  PollLeaderboardModel _getMockPollLeaderboard() {
+    return PollLeaderboardModel(
+      status: 'success',
+      latestPoll: PollSurveyModel(
+        pollId: 'POLL_202608_GALLUP_W4',
+        agency: '한국갤럽',
+        surveyedAt: '2026-08-25',
+        sampleSize: 1002,
+        confidenceLevel: 95.0,
+        marginOfError: 3.1,
+        surveyMethod: '무선전화 RDD 표본 무작위 추출',
+        sourceUrl: 'https://www.gallup.co.kr',
+        candidates: [
+          PollCandidateModel(personId: 'P_LEE_JM', personName: '이재명', partyOrGroup: '더불어민주당', roleTitle: '국회의원 / 당대표', approvalRate: 38.5, rank: 1, deltaRate: 1.8, badgeColor: '#0A84FF'),
+          PollCandidateModel(personId: 'P_HAN_DH', personName: '한동훈', partyOrGroup: '국민의힘', roleTitle: '국회의원 / 당대표', approvalRate: 29.2, rank: 2, deltaRate: -0.4, badgeColor: '#EF4444'),
+          PollCandidateModel(personId: 'P_CHO_KUK', personName: '조국', partyOrGroup: '조국혁신당', roleTitle: '국회의원 / 당대표', approvalRate: 10.4, rank: 3, deltaRate: 0.7, badgeColor: '#30D158'),
+          PollCandidateModel(personId: 'P_OH_SH', personName: '오세훈', partyOrGroup: '국민의힘', roleTitle: '서울특별시장', approvalRate: 7.8, rank: 4, deltaRate: 0.3, badgeColor: '#BF5AF2'),
+          PollCandidateModel(personId: 'P_HONG_JP', personName: '홍준표', partyOrGroup: '국민의힘', roleTitle: '대구광역시장', approvalRate: 5.5, rank: 5, deltaRate: -0.2, badgeColor: '#FF9F0A'),
+        ],
+      ),
+      leaderboard: [
+        PollCandidateModel(personId: 'P_LEE_JM', personName: '이재명', partyOrGroup: '더불어민주당', roleTitle: '국회의원 / 당대표', approvalRate: 38.5, rank: 1, deltaRate: 1.8, badgeColor: '#0A84FF'),
+        PollCandidateModel(personId: 'P_HAN_DH', personName: '한동훈', partyOrGroup: '국민의힘', roleTitle: '국회의원 / 당대표', approvalRate: 29.2, rank: 2, deltaRate: -0.4, badgeColor: '#EF4444'),
+        PollCandidateModel(personId: 'P_CHO_KUK', personName: '조국', partyOrGroup: '조국혁신당', roleTitle: '국회의원 / 당대표', approvalRate: 10.4, rank: 3, deltaRate: 0.7, badgeColor: '#30D158'),
+        PollCandidateModel(personId: 'P_OH_SH', personName: '오세훈', partyOrGroup: '국민의힘', roleTitle: '서울특별시장', approvalRate: 7.8, rank: 4, deltaRate: 0.3, badgeColor: '#BF5AF2'),
+        PollCandidateModel(personId: 'P_HONG_JP', personName: '홍준표', partyOrGroup: '국민의힘', roleTitle: '대구광역시장', approvalRate: 5.5, rank: 5, deltaRate: -0.2, badgeColor: '#FF9F0A'),
+      ],
+      historicalTrends: [
+        {'date': '2026-07-15', '이재명': 34.8, '한동훈': 27.5, '조국': 10.2, '오세훈': 7.0},
+        {'date': '2026-08-01', '이재명': 36.2, '한동훈': 28.4, '조국': 10.0, '오세훈': 7.4},
+        {'date': '2026-08-11', '이재명': 36.7, '한동훈': 29.6, '조국': 9.7, '오세훈': 7.5},
+        {'date': '2026-08-25', '이재명': 38.5, '한동훈': 29.2, '조국': 10.4, '오세훈': 7.8},
+      ],
+    );
+  }
+
+  List<PoliticalEventModel> _getMockEventTimeline(String personId) {
+    return [
+      PoliticalEventModel(
+        eventId: 'EVT_LEE_JM_2026_LEADERSHIP',
+        personId: personId,
+        personName: '이재명',
+        title: '더불어민주당 전당대회 연임 당선 (득표율 85.4%)',
+        eventType: 'PARTY_LEADERSHIP',
+        eventTypeLabel: '당대표 당선',
+        occurredAt: '2026-08-18',
+        significanceScore: 4.9,
+        evidenceTier: 'TIER_1_LEGAL',
+        evidenceTierBadge: '🟢 공시/선관위 팩트',
+        summary: '더불어민주당 전국당원대회에서 역대 최고 득표율로 연임에 성공하여 대권 가도 주도권 확립.',
+        sourceAgency: '중앙선거관리위원회',
+        sourceUrl: 'https://theminjoo.kr',
+      ),
+      PoliticalEventModel(
+        eventId: 'EVT_LEE_JM_2026_POLICY',
+        personId: personId,
+        personName: '이재명',
+        title: '기본소득 및 스마트 행정 PC 인프라 전국 확대 공약 발표',
+        eventType: 'POLICY_LAUNCH',
+        eventTypeLabel: '핵심 정책 발표',
+        occurredAt: '2026-06-12',
+        significanceScore: 4.2,
+        evidenceTier: 'TIER_2_OFFICIAL',
+        evidenceTierBadge: '🔵 공식 정당 발표',
+        summary: '공공 클라우드 및 공공기관 스마트PC 도입 의무화 정책 비전 선포.',
+        sourceAgency: '더불어민주당 정책위원회',
+        sourceUrl: 'https://theminjoo.kr/policy',
+      ),
+    ];
+  }
+
+  EventStockImpactModel _getMockEventStockImpact(String eventId) {
+    return EventStockImpactModel(
+      status: 'success',
+      event: PoliticalEventModel(
+        eventId: eventId,
+        personId: 'P_LEE_JM',
+        personName: '이재명',
+        title: '더불어민주당 전당대회 연임 당선 (득표율 85.4%)',
+        eventType: 'PARTY_LEADERSHIP',
+        eventTypeLabel: '당대표 당선',
+        occurredAt: '2026-08-18',
+        significanceScore: 4.9,
+        evidenceTier: 'TIER_1_LEGAL',
+        evidenceTierBadge: '🟢 공시/선관위 팩트',
+        summary: '전당대회 압승으로 대선 후보 확정 기대감 고조.',
+        sourceAgency: '선관위',
+        sourceUrl: 'https://theminjoo.kr',
+      ),
+      totalAffectedStocks: 3,
+      avgD0Return: 20.8,
+      avgCarD5: 31.0,
+      stocks: [
+        StockImpactDetailModel(
+          corpCode: '00361958',
+          ticker: '045660',
+          companyName: '에이텍',
+          roleTier: 'PRIMARY_ANCHOR',
+          roleTierLabel: '👑 1티어 대장주',
+          factorGrade: 'A+',
+          d0Return: 29.85,
+          carD5: 42.1,
+          volumeSpikeRatio: 6.8,
+          peakReturn: 48.5,
+          marketReactionGrade: '🔥 상한가 직행',
+          connectionHook: '신승영 대표이사 성남 창조경영 CEO포럼 운영위원 (DART 공시 100% 팩트)',
+        ),
+        StockImpactDetailModel(
+          corpCode: '00261948',
+          ticker: '065500',
+          companyName: '오리엔트정공',
+          roleTier: 'PRIMARY_ANCHOR',
+          roleTierLabel: '👑 1티어 대장주',
+          factorGrade: 'A+',
+          d0Return: 18.4,
+          carD5: 28.6,
+          volumeSpikeRatio: 4.5,
+          peakReturn: 31.2,
+          marketReactionGrade: '⚡ 초강세',
+          connectionHook: '소년공 시절 오리엔트시계 근무지 연계 (대선 출마 선언 장소)',
+        ),
+        StockImpactDetailModel(
+          corpCode: '00216583',
+          ticker: '025950',
+          companyName: '동신건설',
+          roleTier: 'DIRECT_PROXY',
+          roleTierLabel: '⚡ 2티어 직결 수혜주',
+          factorGrade: 'A',
+          d0Return: 14.2,
+          carD5: 22.4,
+          volumeSpikeRatio: 3.8,
+          peakReturn: 25.0,
+          marketReactionGrade: '⚡ 강세',
+          connectionHook: '안동 본사 및 초등 동향 네트워크 (경북 SOC 인프라 수혜)',
+        ),
+      ],
+    );
   }
 }
