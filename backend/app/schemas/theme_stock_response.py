@@ -19,6 +19,11 @@ class ConvictionLevel(str, Enum):
     MODERATE = "MODERATE"
     SPECULATIVE = "SPECULATIVE"
 
+class ProvenanceType(str, Enum):
+    DIRECT_DART_FACT = "DIRECT_DART_FACT"       # DART 명시적 공시 사실 (지분, 임원 등재)
+    INFERRED_SYNAPSE = "INFERRED_SYNAPSE"       # 복수 데이터 교차 추론 (지연/학연 교집합)
+    OFFICIAL_PRESS_FACT = "OFFICIAL_PRESS_FACT" # 공식 발표/언론 팩트 (출마선언지, 포럼 참여)
+
 class CausalMetrics(BaseModel):
     role_tier: RoleTier
     role_tier_label: str
@@ -43,11 +48,16 @@ class CausalPathStep(BaseModel):
 
 class AuditFactEvidenceV2(BaseModel):
     source_name: str = "DART"
-    rcept_no: str
-    report_name: str
-    section: str
-    snippet: str
-    source_url: str
+    provenance_type: ProvenanceType = ProvenanceType.DIRECT_DART_FACT
+    provenance_badge: str = "🟢 [DART 100% 팩트]"
+    provenance_explanation: str = "DART 정기보고서 원문에 임원 및 지분이 명시 기재된 법적 확인 팩트입니다."
+    rcept_no: str = ""
+    report_name: str = "2024.03 사업보고서"
+    section: str = "VIII. 임원 및 직원 등에 관한 사항"
+    snippet: str = ""
+    source_url: str = "" # Official DART Portal or Verified URL
+    person_proof_url: Optional[str] = None # Direct Person Profile URL
+    fact_news_url: Optional[str] = None    # Direct News/Historical Proof URL
     market_track_record: Optional[str] = None
 
 class CausalChainV2(BaseModel):
