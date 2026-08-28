@@ -18,8 +18,9 @@ class UrlLauncherHelper {
     return 'https://finance.naver.com/item/main.naver?code=$ticker';
   }
 
-  static String getDartCompanyUrl(String corpCode) {
-    return 'https://dart.fss.or.kr/corp/summary.do?corpCode=$corpCode';
+  static String getDartCompanySearchUrl(String companyName) {
+    final query = Uri.encodeComponent(companyName);
+    return 'https://dart.fss.or.kr/dsab007/main.do?option=corp&corpName=$query';
   }
 
   static String getPersonProfileUrl(String personName) {
