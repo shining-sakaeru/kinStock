@@ -19,9 +19,97 @@ class KinStockAppBar extends StatefulWidget implements PreferredSizeWidget {
 
 class _KinStockAppBarState extends State<KinStockAppBar> {
   final TextEditingController _searchCtrl = TextEditingController();
+  final LayerLink _searchLayerLink = LayerLink();
+  OverlayEntry? _searchOverlayEntry;
   List<SearchItemModel> _searchResults = [];
   bool _isHoveringLogo = false;
   bool _isHoveringFocusChip = false;
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _searchOverlayEntry?.remove();
+    _searchOverlayEntry = null;
+  }
+
+  void _updateOverlay(NavigationController nav) {
+    _removeOverlay();
+    if (_searchResults.isEmpty) return;
+
+    final overlay = Overlay.of(context);
+    _searchOverlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        width: 380,
+        child: CompositedTransformFollower(
+          link: _searchLayerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(0, 42),
+          child: Material(
+            elevation: 16,
+            borderRadius: BorderRadius.circular(10),
+            color: const Color(0xFF0F172A),
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 340),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  shrinkWrap: true,
+                  itemCount: _searchResults.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF1E293B)),
+                  itemBuilder: (context, idx) {
+                    final item = _searchResults[idx];
+                    final isCompany = item.type == 'STOCK' || item.type == 'COMPANY';
+                    return ListTile(
+                      dense: true,
+                      hoverColor: const Color(0xFF1E293B),
+                      leading: Icon(
+                        isCompany ? CupertinoIcons.building_2_fill : CupertinoIcons.person_crop_circle_fill,
+                        color: isCompany ? const Color(0xFF38BDF8) : const Color(0xFF818CF8),
+                        size: 16,
+                      ),
+                      title: Text(
+                        item.title,
+                        style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        item.subtitle,
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      ),
+                      trailing: const Icon(CupertinoIcons.arrow_right_circle_fill, size: 14, color: Color(0xFF38BDF8)),
+                      onTap: () {
+                        _searchCtrl.text = item.title;
+                        _removeOverlay();
+                        setState(() => _searchResults = []);
+                        nav.pivotToNode(item.id, nodeName: item.title, nodeType: isCompany ? 'COMPANY' : 'PERSON');
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_searchOverlayEntry!);
+  }
 
   void _showPivotSelectionDialog(BuildContext context, NavigationController nav) {
     showDialog(
@@ -33,6 +121,8 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
           {'id': 'P_HAN_DH', 'name': '한동훈', 'role': '국회의원 / 국민의힘 대표', 'type': 'PERSON'},
           {'id': 'P_AHN_CS', 'name': '안철수', 'role': '국회의원 / 안랩 창업주', 'type': 'PERSON'},
           {'id': 'P_CHO_KUK', 'name': '조국', 'role': '국회의원 / 조국혁신당 대표', 'type': 'PERSON'},
+          {'id': 'P_OH_SH', 'name': '오세훈', 'role': '서울특별시장 / 4선 시장', 'type': 'PERSON'},
+          {'id': 'P_HONG_JP', 'name': '홍준표', 'role': '대구광역시장 / 전 당대표', 'type': 'PERSON'},
           {'id': 'P_LEE_JY', 'name': '이재용', 'role': '삼성전자 회장', 'type': 'PERSON'},
           {'id': '045660', 'name': '에이텍', 'role': '코스닥 045660 / 스마트PC', 'type': 'COMPANY'},
           {'id': '025950', 'name': '동신건설', 'role': '코스닥 025950 / 안동 본사', 'type': 'COMPANY'},
@@ -51,72 +141,72 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
           insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 520, maxHeight: 580),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(CupertinoIcons.scope, color: Color(0xFF38BDF8), size: 18),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '중심 분석 노드(인물/기업) 즉시 전환',
-                    style: TextStyle(color: Color(0xFFF8FAFC), fontSize: 14, fontWeight: FontWeight.w800),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.xmark_circle_fill, color: Color(0xFF64748B), size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text('클릭 시 해당 인물 또는 기업을 중심축으로 전체 인맥 및 테마주 네트워크를 재구성합니다.',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: figures.length,
-                  itemBuilder: (context, idx) {
-                    final item = figures[idx];
-                    final isSelected = nav.currentFocusName == item['name'];
-                    final isPerson = item['type'] == 'PERSON';
-
-                    return ListTile(
-                      dense: true,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      tileColor: isSelected ? const Color(0xFF38BDF8).withOpacity(0.15) : null,
-                      leading: Icon(
-                        isPerson ? CupertinoIcons.person_crop_circle_fill : CupertinoIcons.building_2_fill,
-                        color: isPerson ? const Color(0xFF818CF8) : const Color(0xFF38BDF8),
-                      ),
-                      title: Text(
-                        item['name']!,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF8FAFC),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(item['role']!, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                      trailing: isSelected ? const Icon(CupertinoIcons.checkmark_alt, color: Color(0xFF38BDF8), size: 18) : null,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        nav.pivotToNode(item['id']!, nodeName: item['name']!, nodeType: item['type']!);
-                      },
-                    );
-                  },
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(CupertinoIcons.scope, color: Color(0xFF38BDF8), size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '중심 분석 노드(인물/기업) 즉시 전환',
+                      style: TextStyle(color: Color(0xFFF8FAFC), fontSize: 14, fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.xmark_circle_fill, color: Color(0xFF64748B), size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                const Text('클릭 시 해당 인물 또는 기업을 중심축으로 전체 인맥 및 테마주 네트워크를 재구성합니다.',
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: figures.length,
+                    itemBuilder: (context, idx) {
+                      final item = figures[idx];
+                      final isSelected = nav.currentFocusName == item['name'];
+                      final isPerson = item['type'] == 'PERSON';
+
+                      return ListTile(
+                        dense: true,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        tileColor: isSelected ? const Color(0xFF38BDF8).withOpacity(0.15) : null,
+                        leading: Icon(
+                          isPerson ? CupertinoIcons.person_crop_circle_fill : CupertinoIcons.building_2_fill,
+                          color: isPerson ? const Color(0xFF818CF8) : const Color(0xFF38BDF8),
+                        ),
+                        title: Text(
+                          item['name']!,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF8FAFC),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(item['role']!, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                        trailing: isSelected ? const Icon(CupertinoIcons.checkmark_alt, color: Color(0xFF38BDF8), size: 18) : null,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          nav.pivotToNode(item['id']!, nodeName: item['name']!, nodeType: item['type']!);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +217,7 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
-        color: Color(0xFF1E293B), // Slate Surface
+        color: Color(0xFF1E293B),
         border: Border(
           bottom: BorderSide(color: Color(0xFF334155), width: 1),
         ),
@@ -151,6 +241,7 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
             child: GestureDetector(
               onTap: () {
                 _searchCtrl.clear();
+                _removeOverlay();
                 setState(() => _searchResults = []);
                 nav.resetToHome();
               },
@@ -207,94 +298,48 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
           ),
           const SizedBox(width: 14),
 
-          // 2. Global Universal Search Bar
+          // 2. Global Universal Search Bar (Non-Clipped Floating Overlay)
           Expanded(
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF334155)),
-                    ),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText: '인물(이재명, 한동훈, 이재용), 기업(에이텍, 삼성전자) 검색...',
-                        hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                        prefixIcon: Icon(CupertinoIcons.search, size: 16, color: Color(0xFF64748B)),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      onChanged: (val) async {
-                        if (val.trim().isEmpty) {
-                          setState(() => _searchResults = []);
-                          return;
-                        }
-                        try {
-                          final results = await nav.apiClient.searchUniversal(val.trim());
-                          setState(() => _searchResults = results.results);
-                        } catch (e) {
-                          debugPrint('Search error: $e');
-                        }
-                      },
-                    ),
-                  ),
+            child: CompositedTransformTarget(
+              link: _searchLayerLink,
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF334155)),
                 ),
-
-                // Search Autocomplete Overlay
-                if (_searchResults.isNotEmpty)
-                  Positioned(
-                    top: 42,
-                    left: 0,
-                    right: 0,
-                    child: Material(
-                      elevation: 8,
-                      borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFF0F172A),
-                      child: Container(
-                        constraints: const BoxConstraints(maxHeight: 250),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _searchResults.length,
-                          itemBuilder: (context, idx) {
-                            final item = _searchResults[idx];
-                            final isCompany = item.type == 'STOCK' || item.type == 'COMPANY';
-                            return ListTile(
-                              dense: true,
-                              leading: Icon(
-                                isCompany ? CupertinoIcons.building_2_fill : CupertinoIcons.person_crop_circle_fill,
-                                color: isCompany ? const Color(0xFF38BDF8) : const Color(0xFF818CF8),
-                                size: 16,
-                              ),
-                              title: Text(item.title, style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12.5, fontWeight: FontWeight.w600)),
-                              subtitle: Text(item.subtitle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                              trailing: const Icon(CupertinoIcons.arrow_right, size: 12, color: Color(0xFF64748B)),
-                              onTap: () {
-                                _searchCtrl.text = item.title;
-                                setState(() => _searchResults = []);
-                                nav.pivotToNode(item.id, nodeName: item.title, nodeType: isCompany ? 'COMPANY' : 'PERSON');
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                child: TextField(
+                  controller: _searchCtrl,
+                  style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13),
+                  decoration: const InputDecoration(
+                    hintText: '인물(이재명, 한동훈, 이재용), 기업(에이텍, 삼성전자) 검색...',
+                    hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                    prefixIcon: Icon(CupertinoIcons.search, size: 16, color: Color(0xFF64748B)),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                   ),
-              ],
+                  onChanged: (val) async {
+                    if (val.trim().isEmpty) {
+                      _removeOverlay();
+                      setState(() => _searchResults = []);
+                      return;
+                    }
+                    try {
+                      final results = await nav.apiClient.searchUniversal(val.trim());
+                      setState(() => _searchResults = results.results);
+                      _updateOverlay(nav);
+                    } catch (e) {
+                      debugPrint('Search error: $e');
+                    }
+                  },
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 8),
 
-          // 3. Current Pivot Entity Indicator (Interactive Focus Selector)
+          // 3. Current Pivot Entity Indicator
           MouseRegion(
             cursor: SystemMouseCursors.click,
             onEnter: (_) => setState(() => _isHoveringFocusChip = true),

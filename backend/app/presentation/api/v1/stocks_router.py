@@ -11,11 +11,15 @@ from app.presentation.dependencies import stock_related_figures_use_case
 router = APIRouter()
 
 @router.get("/stocks", response_model=List[CompanyDto], summary="전체 상장 기업 목록 조회 (실시간 시세 연동)")
-def get_stocks():
-    companies = memory_store.get_all_companies()
+def get_stocks(limit: int = 100):
+    companies = memory_store.get_all_companies()[:limit]
     result = []
-    for c in companies:
-        price, change, cap = realtime_stock_service.fetch_quote(c.ticker, fallback_company=c)
+    for idx, c in enumerate(companies):
+        if idx < 15:
+            price, change, cap = realtime_stock_service.fetch_quote(c.ticker, fallback_company=c)
+        else:
+            price, change, cap = c.current_price, c.price_change_rate, c.market_cap
+
         updated_c = Company(
             id=c.id,
             ticker=c.ticker,
