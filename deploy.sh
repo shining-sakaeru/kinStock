@@ -71,40 +71,18 @@ else
 fi
 
 # 4. Docker Compose Build & Launch
-echo -e "${BLUE}🐳 Starting Docker Compose stack (Neo4j, FastAPI, Flutter Nginx, Cloudflare)...${NC}"
+echo -e "${BLUE}🐳 Starting Docker Compose stack (Neo4j, FastAPI, Nginx)...${NC}"
 $COMPOSE_CMD down || true
 $COMPOSE_CMD up -d --build
 
 echo -e "${CYAN}⏳ Waiting for services to initialize...${NC}"
 sleep 6
 
-# 5. Extract Cloudflare Quick Tunnel URL
-echo -e "${CYAN}🔍 Extracting Cloudflare Tunnel public HTTPS URL...${NC}"
-PUBLIC_URL=""
-for i in {1..30}; do
-    LOGS=$($COMPOSE_CMD logs cloudflare-tunnel 2>&1 || true)
-    URL=$(echo "$LOGS" | grep -o 'https://[-a-zA-Z0-9@:%._\+~#=]*.trycloudflare.com' | tail -n 1 || true)
-    if [ -n "$URL" ]; then
-        PUBLIC_URL="$URL"
-        break
-    fi
-    sleep 2
-done
-
 echo ""
 echo -e "${GREEN}${BOLD}======================================================================${NC}"
 echo -e "${GREEN}${BOLD}   🎉 KinStock All-in-One Service Successfully Deployed!             ${NC}"
 echo -e "${GREEN}${BOLD}======================================================================${NC}"
 echo ""
-
-if [ -n "$PUBLIC_URL" ]; then
-    echo -e "${YELLOW}${BOLD}🌐 Public HTTPS URL (Cloudflare Tunnel):${NC}"
-    echo -e "   👉 ${BOLD}${CYAN}${PUBLIC_URL}${NC}"
-    echo ""
-else
-    echo -e "${YELLOW}⚠️  Cloudflare Tunnel URL is initializing. Run '$COMPOSE_CMD logs cloudflare-tunnel' in a few seconds.${NC}"
-    echo ""
-fi
 
 echo -e "${BOLD}📍 Local & Management Endpoints:${NC}"
 echo -e "   - 📱 Frontend Web App:     ${GREEN}http://localhost:80${NC} (or http://localhost:3000)"
