@@ -312,12 +312,12 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
                 child: TextField(
                   controller: _searchCtrl,
                   style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13),
-                  decoration: const InputDecoration(
-                    hintText: '인물(이재명, 한동훈, 이재용), 기업(에이텍, 삼성전자) 검색...',
-                    hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                    prefixIcon: Icon(CupertinoIcons.search, size: 16, color: Color(0xFF64748B)),
+                  decoration: InputDecoration(
+                    hintText: isMobile ? '인물·기업 검색...' : '인물(이재명, 한동훈, 이재용), 기업(에이텍, 삼성전자) 검색...',
+                    hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                    prefixIcon: const Icon(CupertinoIcons.search, size: 16, color: Color(0xFF64748B)),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                   onChanged: (val) async {
                     if (val.trim().isEmpty) {
@@ -340,36 +340,38 @@ class _KinStockAppBarState extends State<KinStockAppBar> {
           const SizedBox(width: 8),
 
           // 3. Current Pivot Entity Indicator
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            onEnter: (_) => setState(() => _isHoveringFocusChip = true),
-            onExit: (_) => setState(() => _isHoveringFocusChip = false),
-            child: GestureDetector(
-              onTap: () => _showPivotSelectionDialog(context, nav),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _isHoveringFocusChip ? const Color(0xFF38BDF8).withOpacity(0.18) : const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _isHoveringFocusChip ? const Color(0xFF38BDF8) : const Color(0xFF334155)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(CupertinoIcons.scope, size: 13, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 5),
-                    Text(
-                      '중심: ${nav.currentFocusName}',
-                      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(CupertinoIcons.chevron_down, size: 10, color: Color(0xFF64748B)),
-                  ],
+          if (!isMobile) ...[
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => setState(() => _isHoveringFocusChip = true),
+              onExit: (_) => setState(() => _isHoveringFocusChip = false),
+              child: GestureDetector(
+                onTap: () => _showPivotSelectionDialog(context, nav),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _isHoveringFocusChip ? const Color(0xFF38BDF8).withOpacity(0.18) : const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _isHoveringFocusChip ? const Color(0xFF38BDF8) : const Color(0xFF334155)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(CupertinoIcons.scope, size: 13, color: Color(0xFF38BDF8)),
+                      const SizedBox(width: 5),
+                      Text(
+                        '중심: ${nav.currentFocusName}',
+                        style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 12, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(CupertinoIcons.chevron_down, size: 10, color: Color(0xFF64748B)),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
 
           // 4. Batch & Verification Trigger Button
           MouseRegion(
