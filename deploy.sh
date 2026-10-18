@@ -2,7 +2,7 @@
 # ==============================================================================
 # KinStock All-in-One One-Click Deployment Script
 # Target: Oracle Cloud Always Free (ARM64 Ubuntu) or Local Docker Host
-# ==============================================================================
+# ===============================================================================
 
 set -e
 
@@ -64,7 +64,7 @@ mkdir -p data/neo4j/import
 # 3. Optional local Flutter Web build for fast packaging
 if command -v flutter &> /dev/null; then
     echo -e "${BLUE}📦 Building Flutter Web locally for optimized Docker image...${NC}"
-    (cd frontend && flutter build web --release --pwa-strategy=none)
+    (cd frontend && flutter build web --release --web-renderer html --pwa-strategy=none)
     echo -e "${GREEN}✅ Flutter Web build finished!${NC}"
 else
     echo -e "${YELLOW}ℹ️  Local Flutter SDK not detected. Docker multi-stage build will compile Flutter Web inside container.${NC}"
