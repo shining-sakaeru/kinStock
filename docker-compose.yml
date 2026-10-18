@@ -77,8 +77,8 @@ services:
     networks:
       - kinstock-network
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7474:7474" # HTTP Browser
+      - "7687:7687" # Bolt Protocol
     environment:
       - NEO4J_AUTH=neo4j/kinstock2024!
       - NEO4J_server_memory_heap_initial__size=1G
