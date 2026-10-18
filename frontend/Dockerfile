@@ -6,7 +6,7 @@ COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 
 COPY . .
-RUN flutter build web --release --pwa-strategy=none
+RUN flutter build web --release --web-renderer html --pwa-strategy=none
 
 # Stage 2: Nginx Static Server with Reverse Proxy
 FROM nginx:alpine
