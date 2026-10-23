@@ -61,15 +61,7 @@ echo -e "${GREEN}✅ Using Compose Engine:${NC} $COMPOSE_CMD"
 # Ensure data directories exist
 mkdir -p data/neo4j/import
 
-# 3. Optional local Flutter Web build for fast packaging
-if command -v flutter &> /dev/null; then
-    echo -e "${BLUE}📦 Building Flutter Web locally for optimized Docker image...${NC}"
-    (cd frontend && flutter build web --release --pwa-strategy=none)
-    echo -e "${GREEN}✅ Flutter Web build finished!${NC}"
-else
-    echo -e "${YELLOW}ℹ️  Local Flutter SDK not detected. Docker multi-stage build will compile Flutter Web inside container.${NC}"
-fi
-
+# 3. Docker Compose builds the current Flutter Web source in the frontend image.
 # 4. Docker Compose Build & Launch
 echo -e "${BLUE}🐳 Starting Docker Compose stack (Neo4j, FastAPI, Nginx)...${NC}"
 $COMPOSE_CMD down || true
